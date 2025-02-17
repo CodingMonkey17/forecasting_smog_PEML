@@ -29,7 +29,7 @@ def get_component(df: pd.DataFrame) -> str:
     :param df: DataFrame
     :return: str
     """
-    return f"{df['Component'].iloc[0]}"
+    return f"{df['component'].iloc[0]}"
 
 
 def get_unit(df: pd.DataFrame) -> str:
@@ -39,7 +39,7 @@ def get_unit(df: pd.DataFrame) -> str:
     :param df: DataFrame
     :return: str
     """
-    return f"{df['Eenheid'].iloc[0]}"
+    return f"{df['eenheid'].iloc[0]}"
 
 
 def get_metadata(df: pd.DataFrame) -> dict:
@@ -80,12 +80,12 @@ def change_contaminant_date_format(df: pd.DataFrame) -> pd.DataFrame:
     :return: DataFrame with datetime column
     """
     try:
-        df['Begindatumtijd'] = pd.to_datetime(df['Begindatumtijd'],
+        df['begindatumtijd'] = pd.to_datetime(df['begindatumtijd'],
                                               format = '%Y%m%d %H:%M')
     except ValueError:
-        df['Begindatumtijd'] = pd.to_datetime(df['Begindatumtijd'],
+        df['begindatumtijd'] = pd.to_datetime(df['begindatumtijd'],
                                               format = 'ISO8601')
-    df.rename(columns = {'Begindatumtijd' : 'DateTime'},
+    df.rename(columns = {'begindatumtijd' : 'DateTime'},
               inplace = True)
     return df
 
@@ -155,7 +155,10 @@ def fill_NaNs_linear(df: pd.DataFrame) -> pd.DataFrame:
     :param df: DataFrame
     :return: DataFrame with NaNs filled in
     """
-    return df.interpolate(method = 'linear', limit = 24 * 7)
+    # Convert to numeric if not already
+    df = df.apply(pd.to_numeric, errors='coerce')
+    
+    return df.interpolate(method='linear', limit=24 * 7)
 
 
 def subset_month_range(
@@ -256,7 +259,7 @@ def tidy_raw_contaminant_data(
     :return: tidied DataFrame
     """
     df.columns = df.columns.str.strip() # remove leading and trailing ws in col names
-    df = remove_unuseful_cols(df, ['Component', 'Bep.periode', 'Eenheid', 'Einddatumtijd'])
+    df = remove_unuseful_cols(df, ['component', 'meetduur', 'eenheid', 'einddatumtijd'])
                                         # change format to yr-mm-dd hr-mn
     df = change_contaminant_date_format(df)         
                                         # set the index to the dates ('datetime')
@@ -278,8 +281,18 @@ def tidy_raw_contaminant_data(
     # are chosen, "solving" this problem. Allowing some NaNs here helps a bit with looking
     # for adequate data, and the interpolation and filtering here is to just set a baseline
     # of eligibility for the data to be used in the model, as made as of now.
-
+    df = rename_pollutant_cols(df)
     return df
+
+def rename_pollutant_cols(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Renames the columns of the Dataframe to match the new format
+    wide format of the data (i.e. the sensor names) as previous format is
+    (station_id)_(component)_lucht
+    """
+    columns = df.columns
+    new_cols = [col.split("_")[0] for col in columns]
+    return df.rename(columns=dict(zip(columns, new_cols)))
 
 
 def change_meteo_date_format(df: pd.DataFrame) -> pd.DataFrame:
@@ -347,8 +360,7 @@ def tidy_raw_meteo_data(
     df.columns = df.columns.str.strip() # remove leading and trailing ws in col names
     if '# STN' in df.columns:           # change col name of stations
         df = df.rename(columns = {'# STN' : 'STN'})
-    df = remove_unuseful_cols(df, ['T10N', 'FF', 'VV', 'N', 'U',
-                                   'WW', 'IX', 'M', 'R', 'O', 'S', 'Y'])
+    df = remove_unuseful_cols(df, ['T10N', 'FF'])
     df['HH'] = df['HH'].subtract(1)     # 1-24 to 0-23 hour range
     df = change_meteo_date_format(df)   # create DateTime column
     df = df.set_index('DateTime')       # set DateTime as index
@@ -375,3 +387,5 @@ def tidy_raw_meteo_data(
         return df_260
     else:
         return None
+    
+

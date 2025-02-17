@@ -12,7 +12,7 @@ import pandas as pd
 def read_contaminant_csv_from_data_raw(
         component: str,
         year: str,
-        rows_to_skip: int = 9
+        rows_to_skip: int = 5
     ) -> pd.DataFrame:
     """
     Reads the contaminant data from the raw data folder. The data is in CSV format.
