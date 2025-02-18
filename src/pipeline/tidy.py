@@ -360,7 +360,7 @@ def tidy_raw_meteo_data(
     df.columns = df.columns.str.strip() # remove leading and trailing ws in col names
     if '# STN' in df.columns:           # change col name of stations
         df = df.rename(columns = {'# STN' : 'STN'})
-    df = remove_unuseful_cols(df, ['T10N', 'FF'])
+    df = remove_unuseful_cols(df, ['T10N'])
     df['HH'] = df['HH'].subtract(1)     # 1-24 to 0-23 hour range
     df = change_meteo_date_format(df)   # create DateTime column
     df = df.set_index('DateTime')       # set DateTime as index

@@ -83,17 +83,23 @@ def print_split_ratios(
         dfs_test: List[pd.DataFrame], comp: str):
     """
     Prints the splitting ratios (useful
-    after the train-validaiton-test split)
+    after the train-validation-test split)
     
     :param dfs_train: list of training DataFrames
-    :param df_val: validation set DataFrame
-    :param df_test: testing set DataFrame
+    :param dfs_val: list of validation DataFrames
+    :param dfs_test: list of testing DataFrames
     :param comp: component name (although they all (should) have the same ratio)
     """
-    df_val = pd.concat(dfs_val)
-    df_test = pd.concat(dfs_test)
+    # Concatenate the dataframes
+    df_train = pd.concat(dfs_train) if dfs_train else pd.DataFrame()
+    df_val = pd.concat(dfs_val) if dfs_val else pd.DataFrame()
+    df_test = pd.concat(dfs_test) if dfs_test else pd.DataFrame()
+ 
+    total_len = len(df_train) + len(df_val) + len(df_test)
+    if total_len == 0:
+        print(f"No data available for {comp}")
+        return
 
-    total_len = sum([len(df) for df in dfs_train]) + len(df_val) + len(df_test)
     print(f"[train/validation/test] %-ratio for {comp} data is: ", end = '')
-    print(f"[{round((sum([len(df) for df in dfs_train])) / total_len * 100, 1)}/", end = '')
+    print(f"[{round(len(df_train) / total_len * 100, 1)}/", end = '')
     print(f"{round(len(df_val) / total_len * 100, 1)}/{round(len(df_test) / total_len * 100, 1)}]")
