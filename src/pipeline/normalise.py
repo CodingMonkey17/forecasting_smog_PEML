@@ -78,10 +78,10 @@ def normalise_linear_inv(df_norm: pd.DataFrame, min: float, max: float) -> pd.Da
 
 
 def print_pollutant_extremes(
-        dfs: List[pd.DataFrame], bool_print = True
+        dfs: List[pd.DataFrame], pollutants: List[str], bool_print = True
     ) -> pd.DataFrame:
     """
-    Takes a list with eight dataframes:
+    Takes a list of dataframes and a list of pollutants:
     - NO2 minimum
     - NO2 maximum
     - O3 minimum
@@ -95,18 +95,17 @@ def print_pollutant_extremes(
 
     :param dfs: list of dataframes
     :param pollutants: list of pollutants
+    :param bool_print: whether to print the dataframe
     :return: dataframe with minimum and maximum values
     """
-    NO2_min_train, NO2_max_train = calc_combined_min_max_params(dfs[:2])
-    O3_min_train, O3_max_train = calc_combined_min_max_params(dfs[2:4])
-    PM10_min_train, PM10_max_train = calc_combined_min_max_params(dfs[4:6])
-    PM25_min_train, PM25_max_train = calc_combined_min_max_params(dfs[6:])
+    min_max_values = {}
 
-    df_minmax = pd.DataFrame({'NO2':  [NO2_min_train, NO2_max_train],
-                              'O3':   [O3_min_train, O3_max_train],
-                              'PM10': [PM10_min_train, PM10_max_train],
-                              'PM25': [PM25_min_train, PM25_max_train]},
-                              index = ['min', 'max']).T
-    print(df_minmax) if bool_print else None
+    for i, pollutant in enumerate(pollutants):
+        min_train, max_train = dfs[i*2], dfs[i*2+1]
+        min_max_values[pollutant] = [min_train, max_train]
+
+    df_minmax = pd.DataFrame(min_max_values, index=['min', 'max']).T
+    if bool_print:
+        print(df_minmax)
 
     return df_minmax
