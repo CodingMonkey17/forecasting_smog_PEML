@@ -109,3 +109,42 @@ def print_pollutant_extremes(
         print(df_minmax)
 
     return df_minmax
+
+
+def print_weather_extremes(
+        dfs: List[pd.DataFrame], weather_data: List[str], bool_print=True, filename="weather_minmax.csv"
+    ) -> pd.DataFrame:
+    """
+    Takes a list of dataframes and a list of weather variables:
+    - Wind direction (DD) minimum
+    - Wind direction (DD) maximum
+    - Wind speed (FH) minimum
+    - Wind speed (FH) maximum
+    - Temperature (T) minimum
+    - Temperature (T) maximum
+    - etc.
+
+    makes a dataframe of them, prints it and returns it.
+    Also saves the dataframe to a CSV file.
+
+    :param dfs: List of dataframes containing the weather data
+    :param weather_data: List of weather data variables (e.g., ['DD', 'FH', 'T', 'P'])
+    :param bool_print: Whether to print the dataframe
+    :param filename: Name of the CSV file to save
+    :return: DataFrame with minimum and maximum values for each weather variable
+    """
+    min_max_values = {}
+
+    # Loop through each weather data variable (e.g., 'DD', 'FH', 'T', 'P')
+    for i, weather_var in enumerate(weather_data):
+        min_train, max_train = dfs[i*2], dfs[i*2+1]  # Assume dfs contains min and max values for each weather variable
+        min_max_values[weather_var] = [min_train, max_train]
+
+    # Create a DataFrame to hold the min and max values
+    df_minmax = pd.DataFrame(min_max_values, index=['min', 'max']).T
+    
+    # Print the DataFrame if bool_print is True
+    if bool_print:
+        print(df_minmax)
+
+    return df_minmax

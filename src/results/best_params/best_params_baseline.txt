@@ -1,0 +1,1 @@
+best_params_baseline = {"n_hidden_layers": 4, "n_hidden_units": 194, "lr": 0.0025532081590650484, "weight_decay": 1.3029599229861795e-08, "batch_size": 16}

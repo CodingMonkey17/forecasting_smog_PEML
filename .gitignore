@@ -14,3 +14,4 @@ Pipfile.lock
 __pycache__/
 GRU.ipynb
 venv
+.env

@@ -18,8 +18,8 @@ import seaborn as sns
 
 
 # Global variables for plots.py (bad but coincidentally useful practice!)
-CONTAMINANTS = ['NO2', 'O3', 'PM10', 'PM25']
-MINMAX_PATH = "../data/data_combined/contaminant_minmax.csv"
+CONTAMINANTS = ['NO2']
+MINMAX_PATH = "../data/data_combined/pollutants_minmax.csv"
 
 
 def set_style() -> None:
