@@ -7,7 +7,7 @@ from modelling.loss import *
 
 
 class BasicMLP(nn.Module):
-    def __init__(self, N_INPUT_UNITS, N_HIDDEN_LAYERS, N_HIDDEN_UNITS, N_OUTPUT_UNITS, loss_function="MSE"):
+    def __init__(self, N_INPUT_UNITS = 72, N_HIDDEN_LAYERS = 2, N_HIDDEN_UNITS = 100, N_OUTPUT_UNITS = 24, loss_function="MSE"):
         super(BasicMLP, self).__init__()
         self.loss_function = loss_function  # Store the loss function type
 
