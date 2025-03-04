@@ -1,1 +1,1 @@
-best_params = {'n_hidden_layers': 5, 'n_hidden_units': 202, 'lr': 0.0030908578887602826, 'weight_decay': 1.2191937471295825e-07, 'batch_size': 16}
+best_params = {'n_hidden_layers': 2, 'n_hidden_units': 237, 'lr': 0.004360166659287016, 'weight_decay': 5.881374833423609e-08, 'batch_size': 16}

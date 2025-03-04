@@ -16,7 +16,7 @@ dd_idx = 0 # Wind direction index
 fh_idx = 2 # Wind speed index
 
 # Define the distance between Tuindorp and Breukelen in km
-D_TUINDORP_BREUKELEN = 10  # Example: 10 km (adjust as needed)
+D_TUINDORP_BREUKELEN = 11.36  # Example: 10 km (adjust as needed)
 N_HOURS_U = 24 * 3               # number of hours to use for input (number of days * 24 hours)
 N_HOURS_Y = 24                    # number of hours to predict (1 day * 24 hours)
 N_HOURS_STEP = 24                # step size for sliding window
