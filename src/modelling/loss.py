@@ -32,8 +32,20 @@ def smape(y_pred, y_true):
     return 100 * torch.mean(numerator / denominator)
 
 
+def mse_loss(y_pred, y_true):
+    """Mean Squared Error loss."""
+    criterion = nn.MSELoss()
+    return criterion(y_pred, y_true)
 
-def compute_y_phy(u, time_step=1):
+def get_wind_direction(u):
+    # Adjust lambda_phy based on wind direction (higher if wind is favorable)
+    wind_direction_normalised = u[:, :, dd_idx]
+
+    # Rescale the normalized wind direction (0 to 1) back to degrees (0° to 360°)
+    wind_direction_degrees = wind_direction_normalised * 360
+    return wind_direction_degrees
+
+def compute_linear_y_phy(u, time_step=1):
     """
     Computes y_phy using the same indexing technique as y.
     
@@ -53,21 +65,12 @@ def compute_y_phy(u, time_step=1):
 
     # Compute travel time in hours: t = d / u
     travel_time = D_TUINDORP_BREUKELEN / (wind_speed_kmh + 1e-6)  # Avoid division by zero
-
-    # print("travel_time:")
-    # print(travel_time)
-    # print(travel_time.shape)
-
     # Convert travel time to index shifts (time steps), rounding UP to nearest hour
     time_shifts = torch.ceil(travel_time / time_step).long()  # (batch_size, N_HOURS_U)
     # Ensure valid indexing (clamp time shift to stay within history range)
     time_shifts = torch.clamp(time_shifts, min=0, max=N_HOURS_U - N_HOURS_Y)
 
-    # print("time_shifts:")
-    # print(time_shifts)
-    # print(time_shifts.shape)
-    
-# Compute y_phy by shifting pollution data accordingly
+    # Compute y_phy by shifting pollution data accordingly
     y_phy = torch.zeros((batch_size, N_HOURS_Y, 1), device=u.device)  # Initialize tensor
 
     for b in range(batch_size):
@@ -76,69 +79,58 @@ def compute_y_phy(u, time_step=1):
             src_idx = max(0, N_HOURS_U - N_HOURS_Y - shift_t + t)  # Ensure valid index
             y_phy[b, t, 0] = pollution[b, src_idx]
 
-    # print("y_phy:")
-    # print(y_phy)
-    # print(y_phy.shape)
     return y_phy
 
-def compute_phy_loss(y_pred, u):
-    """
-    Computes physics-aware loss function based on the advection equation.
-    - y_pred: Predicted pollution level
-    - y_true: Ground truth pollution level
+
+
+def compute_weighted_total_loss(mse_loss = None, phy_loss = None, lambda_phy = 0.8, u = None):
+    '''
+    Computes the total loss as the sum of MSE and Physics loss, weighted by lambda_phy.
+    - mse_loss: Mean Squared Error loss
+    - phy_loss: Physics loss
+    - lambda_phy: Weighting factor (for wind dir towards Breukeln) for physics loss, e.g 0.8 for wind dir towards Breukeln
     - u: Input features containing wind direction, wind speed, and pollution history
-    - time_shift: The computed time shift based on wind speed/direction (e.g., 1 hour)
-    """
-    # Compute y_phy
-    time_shift = 1  # Assume 1-hour shift for now (adjust dynamically if needed)
-    y_phy = compute_y_phy(u, time_shift)
+    '''
+    # warning in case anything is None
+    if mse_loss is None or phy_loss is None or u is None:
+        print('Warning: some of the inputs are None')
 
-    # print("y_phy:")
-    # print(y_phy)
-    # print(y_phy.shape)
-
-    # print("y_pred:")
-    # print(y_pred)
-    # print(y_pred.shape) # sth wrong here
-    # Compute physics loss
-    physics_loss = nn.MSELoss()(y_pred, y_phy)
-
+    wind_direction_degrees = get_wind_direction(u)
     
-    return physics_loss
+    # Adjust lambda_phy based on the wind direction (closer to 270° means favorable wind direction)
+    if not torch.mean(wind_direction_degrees) > 200:  # Threshold for favorable wind direction (adjust as needed)
+        lambda_phy = 1 - lambda_phy  # if not favorable wind direction, then use 1 - lambda_phy
+    # Total loss is the sum of MSE and Physics loss, weighted by lambda_phy
+    total_loss = mse_loss + lambda_phy * phy_loss
+    return total_loss
 
 
-# Physics-aware loss function
-def compute_loss(y_pred, y_true, u, loss_function, lambda_phy=0.1):
+# Computing loss for tuning, training, testing the model for actual prediction
+def compute_loss(y_pred, y_true, u, loss_function, lambda_phy = 0.8):
     """
     Computes loss function based on global variable setting.
     - y_pred: Predicted pollution level
     - y_true: Ground truth pollution level
     - u: Input features containing wind direction, wind speed, and pollution history
-    - loss_function: "MSE" or "Physics_MSE"
-    - lambda_phy: Weighting factor for physics loss (higher if wind blows from Tuindorp to Breukelen)
+    - loss_function: "MSE" or "Physics_Linear_MSE"
+    - lambda_phy: Weighting factor (for wind dir towards Breukeln) for physics loss, e.g 0.8 weight for wind dir towards Breukeln
 
     Returns: Total loss (MSE or MSE + Physics loss)
     """
-    mse_loss = nn.MSELoss()(y_pred, y_true)
+    basic_mse_loss = mse_loss(y_pred, y_true)
 
     if loss_function == "MSE":
-        return mse_loss
+        return basic_mse_loss
 
-    elif loss_function == "Physics_MSE":
-        phy_loss = compute_phy_loss(y_pred, u)
-        # Adjust lambda_phy based on wind direction (higher if wind is favorable)
-        wind_direction_normalised = u[:, :, dd_idx]
-
-        # Rescale the normalized wind direction (0 to 1) back to degrees (0° to 360°)
-        # formula: scaled = (x - min) / (max - min)
-        wind_direction_degrees = wind_direction_normalised * 360
+    elif loss_function == "Physics_Linear_MSE":
+        y_phy = compute_linear_y_phy(u, time_step = 1)
+        phy_loss = mse_loss(y_pred, y_phy) # L_phy (y_pred, y_phy) = MSE(y_pred, y_phy)
+        total_weighted_loss = compute_weighted_total_loss(basic_mse_loss, phy_loss, lambda_phy, u) # L = L_mse + lambda_phy * L_phy
+        return total_weighted_loss
         
-        # Adjust lambda_phy based on the wind direction (closer to 270° means favorable wind direction)
-        if torch.mean(wind_direction_degrees) > 200:  # Threshold for favorable wind direction (adjust as needed)
-            lambda_phy = 0.8  # Increase weight if wind is blowing towards Tuindorp to Breukelen (westward)
-        else:
-            lambda_phy = 0.2  # Default weight if wind is blowing in other directions
-
-        # Total loss is the sum of MSE and Physics loss, weighted by lambda_phy
-        total_loss = mse_loss + lambda_phy * phy_loss
-        return total_loss
+    elif loss_function == "Physics_PDE":
+        # after training the y_phy with pde, we can use it to compute the loss
+        # y_phy = ...
+        phy_loss = mse_loss(y_pred, y_phy)
+        total_weighted_loss = compute_weighted_total_loss(basic_mse_loss, phy_loss, lambda_phy, u)
+        return total_weighted_loss
