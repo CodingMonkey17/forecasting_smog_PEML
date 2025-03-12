@@ -31,21 +31,14 @@ class BasicMLP(nn.Module):
 
         return outputs[:, -24:, :]  # Predict last 24 hours
 
-    def train_model(self, train_loader, val_loader, epochs=50, lr=1e-3, weight_decay=1e-6, device="cpu"):
+    def train_model(self, train_loader, val_loader, epochs=50, lr=1e-3, weight_decay=1e-6, lambda_phy = 1e-5, device="cpu"):
         self.to(device)
         optimizer = optim.Adam(self.parameters(), lr=lr, weight_decay=weight_decay)
 
         best_val_loss = float("inf")
         best_model_state = None
 
-        train_losses = []
-        val_losses = []
         
-        # Initialize lists to store y_phy and y_pred for later plotting
-        all_y_phy_train = []
-        all_y_pred_train = []
-        all_y_phy_val = []
-        all_y_pred_val = []
 
         for epoch in range(epochs):
             self.train()
@@ -57,19 +50,15 @@ class BasicMLP(nn.Module):
 
                 output = self.forward(u)
                 
-                loss, y_phy, y_pred = compute_loss(output, y, u, self.loss_function, lambda_phy = 1e-5)  # Compute loss based on selected function
-                
-                # Append y_phy and y_pred to lists for training data
-                all_y_phy_train.append(y_phy.cpu().detach().numpy())  # .cpu() to move to CPU, .detach() to avoid tracking gradients
-                all_y_pred_train.append(y_pred.cpu().detach().numpy())
+                loss, y_phy, y_pred = compute_loss(output, y, u, self.loss_function, lambda_phy = lambda_phy)  # Compute loss based on selected function
 
                 loss.backward()
                 optimizer.step()
                 train_loss += loss.item()
 
             train_loss /= len(train_loader)
-            train_losses.append(train_loss)
 
+            rmse_loss = 0.0
             # Validation step
             self.eval()
             val_loss = 0.0
@@ -77,34 +66,26 @@ class BasicMLP(nn.Module):
                 for u, y in val_loader:
                     u, y = u.to(device), y.to(device)
                     output = self.forward(u)
-                    loss, y_phy, y_pred = compute_loss(output, y, u, self.loss_function)
-
-                    # Append y_phy and y_pred to lists for validation data
-                    all_y_phy_val.append(y_phy.cpu().detach().numpy())
-                    all_y_pred_val.append(y_pred.cpu().detach().numpy())
-
-                    val_loss += loss.item()
+                    mse_loss_fn = nn.MSELoss()
+                    mse_loss = mse_loss_fn(output, y)
+                    #val loss is rmse
+                    val_loss += torch.sqrt(mse_loss).item()
 
             val_loss /= len(val_loader)
-            val_losses.append(val_loss)
 
             # Save best model
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 best_model_state = self.state_dict()
 
-            print(f"Epoch {epoch+1}/{epochs} - Train Loss: {train_loss:.6f} - Val Loss: {val_loss:.6f}")
+            print(f"Epoch {epoch+1}/{epochs} - Train Loss (phy+DD): {train_loss:.6f} - Val Loss (DD rmse): {val_loss:.6f}")
 
         if best_model_state:
             self.load_state_dict(best_model_state)
 
-        # Flatten the list of values for easier plotting
-        all_y_phy_train = np.concatenate(all_y_phy_train)
-        all_y_pred_train = np.concatenate(all_y_pred_train)
-        all_y_phy_val = np.concatenate(all_y_phy_val)
-        all_y_pred_val = np.concatenate(all_y_pred_val)
+       
 
-        return best_val_loss, train_losses, val_losses, all_y_phy_train, all_y_pred_train, all_y_phy_val, all_y_pred_val
+        return best_val_loss
 
 
     def test_model(self, test_loader, min_value=None, max_value=None, device="cpu"):
