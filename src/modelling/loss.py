@@ -20,10 +20,21 @@ dd_idx = 0 # Wind direction index
 fh_idx = 2 # Wind speed index
 
 # Define the distance between Tuindorp and Breukelen in km
-D_TUINDORP_BREUKELEN = 11.36  # Example: 10 km (adjust as needed)
 N_HOURS_U = 24 * 3               # number of hours to use for input (number of days * 24 hours)
 N_HOURS_Y = 24                    # number of hours to predict (1 day * 24 hours)
 N_HOURS_STEP = 24                # step size for sliding window
+
+# Define known coordinates
+lat_tuindorp, lon_tuindorp = 52.10503, 5.12448 # Coordinates of Tuindorp based on valentijn thesis (52°06’18.1”N, 5°07’28.1”E) and converted
+lat_breukelen, lon_breukelen = 52.20153, 4.98741 # Positioned at a 30° angle from Tuindorp 
+
+def latlon_to_xy(lat1, lon1, lat2, lon2):
+    """Convert lat/lon to approximate x, y in km using the equirectangular projection."""
+    R = 6371  # Radius of Earth in km
+    x = (lon2 - lon1) * (math.pi / 180) * R * math.cos(math.radians((lat1 + lat2) / 2))
+    y = (lat2 - lat1) * (math.pi / 180) * R
+    return x, y
+
 
 # Function to calculate RMSE
 def rmse(y_pred, y_true):
@@ -66,9 +77,15 @@ def compute_linear_y_phy(u, time_step=1):
 
     # Convert wind speed from m/s to km/h
     wind_speed_kmh = wind_speed * 3.6  
+    
+     # Convert to (x, y) in km
+    x_breukelen, y_breukelen = latlon_to_xy(lat_tuindorp, lon_tuindorp, lat_breukelen, lon_breukelen)
+    x_tuindorp, y_tuindorp = 0, 0  # Set Tuindorp as the origin
+    # Compute distance between Tuindorp and Breukelen
+    distance = math.sqrt(x_breukelen**2 + y_breukelen**2)
 
     # Compute travel time in hours: t = d / u
-    travel_time = D_TUINDORP_BREUKELEN / (wind_speed_kmh + 1e-6)  # Avoid division by zero
+    travel_time = distance / (wind_speed_kmh + 1e-6)  # Avoid division by zero
     # Convert travel time to index shifts (time steps), rounding UP to nearest hour
     time_shifts = torch.ceil(travel_time / time_step).long()  # (batch_size, N_HOURS_U)
     # Ensure valid indexing (clamp time shift to stay within history range)
@@ -132,16 +149,7 @@ def compute_pde_numerical_y_phy(u, scaler = None):
     vx = wind_speed_kmh * torch.cos(torch.deg2rad(wind_direction))  # Wind component in x
     vy = wind_speed_kmh * torch.sin(torch.deg2rad(wind_direction))  # Wind component in y
 
-    def latlon_to_xy(lat1, lon1, lat2, lon2):
-        """Convert lat/lon to approximate x, y in km using the equirectangular projection."""
-        R = 6371  # Radius of Earth in km
-        x = (lon2 - lon1) * (math.pi / 180) * R * math.cos(math.radians((lat1 + lat2) / 2))
-        y = (lat2 - lat1) * (math.pi / 180) * R
-        return x, y
 
-    # Define known coordinates
-    lat_tuindorp, lon_tuindorp = 52.10503, 5.12448 # Coordinates of Tuindorp based on valentijn thesis (52°06’18.1”N, 5°07’28.1”E) and converted
-    lat_breukelen, lon_breukelen = 52.20153, 4.98741 # Positioned at a 30° angle from Tuindorp 
 
     # Convert to (x, y) in km
     x_breukelen, y_breukelen = latlon_to_xy(lat_tuindorp, lon_tuindorp, lat_breukelen, lon_breukelen)
@@ -194,6 +202,7 @@ def compute_loss(y_pred, y_true, u, loss_function, lambda_phy):
     Returns: Total loss (MSE or MSE + Physics loss)
     """
     basic_mse_loss = mse_loss(y_pred, y_true)
+
 
     if loss_function == "MSE":
         # print(basic_mse_loss)
