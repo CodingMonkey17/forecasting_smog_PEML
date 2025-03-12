@@ -50,7 +50,7 @@ class BasicMLP(nn.Module):
 
                 output = self.forward(u)
                 
-                loss, y_phy, y_pred = compute_loss(output, y, u, self.loss_function, lambda_phy = lambda_phy)  # Compute loss based on selected function
+                loss= compute_loss(output, y, u, self.loss_function, lambda_phy = lambda_phy)  # Compute loss based on selected function
 
                 loss.backward()
                 optimizer.step()
@@ -78,7 +78,7 @@ class BasicMLP(nn.Module):
                 best_val_loss = val_loss
                 best_model_state = self.state_dict()
 
-            print(f"Epoch {epoch+1}/{epochs} - Train Loss (phy+DD): {train_loss:.6f} - Val Loss (DD rmse): {val_loss:.6f}")
+            print(f"Epoch {epoch+1}/{epochs} - Train Loss: {train_loss:.6f} - Val Loss (DD rmse only): {val_loss:.6f}")
 
         if best_model_state:
             self.load_state_dict(best_model_state)

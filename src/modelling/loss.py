@@ -155,7 +155,7 @@ def compute_pde_numerical_y_phy(u, scaler = None):
         Advection equation: dC/dt + vx * dC/dx + vy * dC/dy = 0
         We solve it for a single trajectory per batch iteration.
         """
-        dC_dt = -vx * (C / (x_breukelen - x_tuindorp)) - vy * (C / (y_breukelen - y_tuindorp))
+        dC_dt = -vx * (C / abs(x_breukelen - x_tuindorp)) - vy * (C / abs(y_breukelen - y_tuindorp))
         return dC_dt
 
     # Initialize y_phy output tensor
@@ -182,7 +182,7 @@ def compute_pde_numerical_y_phy(u, scaler = None):
 
 
 # Computing loss for tuning, training, testing the model for actual prediction
-def compute_loss(y_pred, y_true, u, loss_function, lambda_phy = 0.0001):
+def compute_loss(y_pred, y_true, u, loss_function, lambda_phy):
     """
     Computes loss function based on global variable setting.
     - y_pred: Predicted pollution level
@@ -196,6 +196,7 @@ def compute_loss(y_pred, y_true, u, loss_function, lambda_phy = 0.0001):
     basic_mse_loss = mse_loss(y_pred, y_true)
 
     if loss_function == "MSE":
+        # print(basic_mse_loss)
         return basic_mse_loss
 
     elif loss_function == "Physics_Linear_MSE":
@@ -226,4 +227,4 @@ def compute_loss(y_pred, y_true, u, loss_function, lambda_phy = 0.0001):
         print("Phy loss", phy_loss)
         print("MSE loss", basic_mse_loss)
         print("total_weighted_loss", total_weighted_loss)
-        return total_weighted_loss, y_phy, y_pred
+        return total_weighted_loss

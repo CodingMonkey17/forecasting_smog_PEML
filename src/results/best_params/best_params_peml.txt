@@ -1,1 +1,10 @@
+Linear time shifting
 best_params = {'n_hidden_layers': 2, 'n_hidden_units': 237, 'lr': 0.004360166659287016, 'weight_decay': 5.881374833423609e-08, 'batch_size': 16}
+
+PDE numerical solver MLP
+{'n_hidden_layers': 2,
+ 'n_hidden_units': 248,
+ 'lr': 0.008546234469271084,
+ 'weight_decay': 5.8109030823582454e-08,
+ 'batch_size': 32,
+ 'lambda_phy': 0.09838214154627214}
