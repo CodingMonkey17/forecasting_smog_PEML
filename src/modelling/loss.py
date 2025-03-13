@@ -126,7 +126,7 @@ def compute_weighted_total_loss(mse_loss = None, phy_loss = None, lambda_phy = 0
     return total_loss
 
 
-def compute_pde_numerical_y_phy(u, scaler = None):
+def compute_pde_numerical_const_y_phy(u):
     """
     Computes y_phy using the numerical solution of the advection PDE.
     
@@ -183,6 +183,7 @@ def compute_pde_numerical_y_phy(u, scaler = None):
         )
 
         # Store the result in y_phy
+        # Clamp the values to be within [0, 1] range for backpropagation to match ypred
         y_phy[b, :, 0] = torch.clamp(torch.tensor(sol.y[0], device=u.device), min=0, max=1)
 
     
@@ -214,12 +215,12 @@ def compute_loss(y_pred, y_true, u, loss_function, lambda_phy):
         total_weighted_loss = compute_weighted_total_loss(basic_mse_loss, phy_loss, lambda_phy, u) # L = L_mse + lambda_phy * L_phy
         return total_weighted_loss
         
-    elif loss_function == "Physics_PDE":
+    elif loss_function == "Physics_PDE_numerical_constant":
         # after training the y_phy with pde, we can use it to compute the loss
         # Assuming y_train is your ground truth training labels
 
 
-        y_phy, vx, vy, wind_direction = compute_pde_numerical_y_phy(u=u)
+        y_phy, vx, vy, wind_direction = compute_pde_numerical_const_y_phy(u=u)
         phy_loss = mse_loss(y_pred, y_phy)
         total_weighted_loss = compute_weighted_total_loss(basic_mse_loss, phy_loss, lambda_phy, u)
         # if phy_loss > 200:
