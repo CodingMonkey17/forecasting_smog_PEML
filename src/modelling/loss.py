@@ -187,7 +187,75 @@ def compute_pde_numerical_const_y_phy(u):
         y_phy[b, :, 0] = torch.clamp(torch.tensor(sol.y[0], device=u.device), min=0, max=1)
 
     
-    return y_phy, vx, vy, wind_direction
+    return y_phy
+
+def compute_pde_numerical_piecewise_y_phy(u):
+    """
+    Computes y_phy using the numerical solution of the piecewise constant advection PDE.
+    
+    Parameters:
+    - u: Input tensor of shape (batch_size, N_HOURS_U, features)
+    
+    Returns:
+    - y_phy: Tensor of shape (batch_size, N_HOURS_Y, 1) representing pollution levels in Breukelen.
+    """
+    batch_size, total_time_steps, num_features = u.shape  # Get batch size and dimensions
+
+    # Extract wind speed and direction from input tensor
+    wind_speed = u[:, :, fh_idx]  # Wind speed (FH) in m/s
+    wind_direction = u[:, :, dd_idx] * 360  # Convert normalized [0,1] to degrees
+
+    # Convert wind speed from m/s to km/h
+    wind_speed_kmh = wind_speed * 3.6  
+
+    # Compute wind velocity components (vx, vy) using wind direction
+    vx = wind_speed_kmh * torch.cos(torch.deg2rad(wind_direction))  # Wind component in x
+    vy = wind_speed_kmh * torch.sin(torch.deg2rad(wind_direction))  # Wind component in y
+
+    # Convert to (x, y) in km
+    x_breukelen, y_breukelen = latlon_to_xy(lat_tuindorp, lon_tuindorp, lat_breukelen, lon_breukelen)
+    x_tuindorp, y_tuindorp = 0, 0  # Set Tuindorp as the origin
+
+    # Time steps from hour 48 to hour 72 (matching physics assumptions)
+    t_eval = np.linspace(0, N_HOURS_Y - 1, N_HOURS_Y)
+
+    def piecewise_advection_pde(t, C, vx_t, vy_t):
+        """
+        Piecewise constant advection equation:
+        dC/dt + vx(t) * dC/dx + vy(t) * dC/dy = 0
+
+        The velocity field (vx, vy) changes in time but remains constant in space.
+        """
+        # Use piecewise constant velocity: Find closest time index and use corresponding wind speed
+        time_idx = min(int(t), len(vx_t) - 1)  
+        vx_current = vx_t[time_idx]
+        vy_current = vy_t[time_idx]
+
+        dC_dt = -vx_current * (C / abs(x_breukelen - x_tuindorp)) - vy_current * (C / abs(y_breukelen - y_tuindorp))
+        return dC_dt
+
+    # Initialize y_phy output tensor
+    y_phy = torch.zeros((batch_size, N_HOURS_Y, 1), device=u.device)
+
+    for b in range(batch_size):
+        # Initial condition: Pollution concentration at Tuindorp at the starting time (hour 48)
+        C0 = u[b, -N_HOURS_Y, no2_idx].cpu().numpy()  # Initial NO2 concentration
+
+        # Solve PDE numerically using solve_ivp
+        sol = solve_ivp(
+            piecewise_advection_pde, 
+            (0, N_HOURS_Y - 1),  # Time span
+            [C0],  # Initial condition
+            t_eval=t_eval,  # Evaluation time points
+            args=(vx[b, -N_HOURS_Y:].cpu().numpy(), vy[b, -N_HOURS_Y:].cpu().numpy())  # Piecewise vx, vy
+        )
+
+        # Store the result in y_phy
+        # Clamp the values to be within [0, 1] range for backpropagation
+        y_phy[b, :, 0] = torch.clamp(torch.tensor(sol.y[0], device=u.device), min=0, max=1)
+
+    return y_phy
+
 
 
 # Computing loss for tuning, training, testing the model for actual prediction
@@ -220,19 +288,20 @@ def compute_loss(y_pred, y_true, u, loss_function, lambda_phy):
         # Assuming y_train is your ground truth training labels
 
 
-        y_phy, vx, vy, wind_direction = compute_pde_numerical_const_y_phy(u=u)
+        y_phy = compute_pde_numerical_const_y_phy(u=u)
         phy_loss = mse_loss(y_pred, y_phy)
         total_weighted_loss = compute_weighted_total_loss(basic_mse_loss, phy_loss, lambda_phy, u)
-        # if phy_loss > 200:
-        #     print("------------PHY LOSS IS TOO HIGH------------")
-        #     print("Phy loss", phy_loss)
-        #     print("MSE loss", basic_mse_loss)  
-        #     print("total_weighted_loss", total_weighted_loss) 
-        #     print('vx', vx)
-        #     print('vy', vy)
-        #     print('wind_direction', wind_direction)
-        #     print("y_pred", y_pred)
-        #     print("y_phy", y_phy)
+
+
+        print("Phy loss", phy_loss)
+        print("MSE loss", basic_mse_loss)
+        print("total_weighted_loss", total_weighted_loss)
+        return total_weighted_loss
+    elif loss_function == "Physics_PDE_numerical_piecewise":
+        # print("Computing loss for Physics_PDE_numerical_piecewise")
+        y_phy = compute_pde_numerical_piecewise_y_phy(u=u)
+        phy_loss = mse_loss(y_pred, y_phy)
+        total_weighted_loss = compute_weighted_total_loss(basic_mse_loss, phy_loss, lambda_phy, u)
 
         print("Phy loss", phy_loss)
         print("MSE loss", basic_mse_loss)

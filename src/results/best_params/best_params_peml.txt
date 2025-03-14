@@ -1,10 +1,18 @@
 Linear time shifting
-best_params = {'n_hidden_layers': 2, 'n_hidden_units': 237, 'lr': 0.004360166659287016, 'weight_decay': 5.881374833423609e-08, 'batch_size': 16}
+best_params = {'n_hidden_layers': 5, 'n_hidden_units': 219, 'lr': 0.001400724556706755, 'weight_decay': 1.4564281375374214e-08, 'batch_size': 16}
 
-PDE numerical solver MLP
+PDE numerical solver MLP eq 1 constant 
 {'n_hidden_layers': 2,
  'n_hidden_units': 248,
  'lr': 0.008546234469271084,
  'weight_decay': 5.8109030823582454e-08,
  'batch_size': 32,
  'lambda_phy': 0.09838214154627214}
+
+ PDE numerical solver MLP eq 2 piecewise
+ {'n_hidden_layers': 1,
+ 'n_hidden_units': 228,
+ 'lr': 0.001940724003728095,
+ 'weight_decay': 3.3204225221165306e-07,
+ 'batch_size': 16,
+ 'lambda_phy': 0.06140327716737013}
