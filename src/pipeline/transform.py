@@ -70,6 +70,11 @@ def sort_dict_of_dfs(
     :param components_sorted: list of components
     :return: sorted list of dataframes
     """
+    print('IN function sort dict of dfs')
+    # print(dfs_dict.keys())
+    # print(dfs_dict.values())
+    # print(type(dfs_dict))
+    print("After", dfs_dict)
     return [dfs_dict[name] for name in components_sorted]
 
 
@@ -127,6 +132,8 @@ def concat_frames_horizontally(
     """
     dfs_dict = make_manual_dict_of_dfs(dfs, components)
     components_sorted = sorted(components)
+    print("before", dfs_dict)
+    print(components_sorted)
     dfs_sorted = sort_dict_of_dfs(dfs_dict, components_sorted)
     
     df = pd.concat(objs = dfs_sorted, 
