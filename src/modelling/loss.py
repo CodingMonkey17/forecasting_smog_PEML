@@ -7,6 +7,8 @@ from scipy.integrate import solve_ivp
 import numpy as np
 import math
 from sklearn.preprocessing import MinMaxScaler
+from pde import CartesianGrid, ScalarField, VectorField, PDE
+from scipy.interpolate import interp1d
 
 # To do
 # fix up the compute y phy, now it computes in shape of input size but not output
@@ -104,7 +106,7 @@ def compute_linear_y_phy(u, time_step=1):
 
 
 
-def compute_weighted_total_loss(mse_loss = None, phy_loss = None, lambda_phy = 0.8, u = None):
+def compute_weighted_total_loss(mse_loss = None, phy_loss = None, lambda_phy = 1e-5, u = None):
     '''
     Computes the total loss as the sum of MSE and Physics loss, weighted by lambda_phy.
     - mse_loss: Mean Squared Error loss
@@ -126,68 +128,79 @@ def compute_weighted_total_loss(mse_loss = None, phy_loss = None, lambda_phy = 0
     return total_loss
 
 
+
+
 def compute_pde_numerical_const_y_phy(u):
     """
-    Computes y_phy using the numerical solution of the advection PDE.
+    Computes y_phy using the numerical solution of the advection PDE using PyPDE.
+    Initial condition interpolates pollution levels from Tuindorp to Breukelen.
     
     Parameters:
     - u: Input tensor of shape (batch_size, N_HOURS_U, features)
-    
+
     Returns:
     - y_phy: Tensor of shape (batch_size, N_HOURS_Y, 1) representing pollution levels in Breukelen.
     """
-    batch_size, total_time_steps, num_features = u.shape  # Get batch size and dimensions
+    batch_size, total_time_steps, num_features = u.shape  
 
-    # Extract wind speed and direction from input tensor
-    wind_speed = u[:, :, fh_idx]  # Wind speed (FH) in m/s
-    wind_direction = u[:, :, dd_idx] * 360  # Convert normalized [0,1] to degrees
+    # Extract wind speed and direction
+    wind_speed = u[:, :, fh_idx]  
+    wind_direction = u[:, :, dd_idx] * 360  
 
-    # Convert wind speed from m/s to km/h
     wind_speed_kmh = wind_speed * 3.6  
 
-    # Compute wind velocity components (vx, vy) using wind direction
-    vx = wind_speed_kmh * torch.cos(torch.deg2rad(wind_direction))  # Wind component in x
-    vy = wind_speed_kmh * torch.sin(torch.deg2rad(wind_direction))  # Wind component in y
+    # Compute wind velocity components (vx, vy)
+    vx = wind_speed_kmh * torch.cos(torch.deg2rad(wind_direction))  
+    vy = wind_speed_kmh * torch.sin(torch.deg2rad(wind_direction))  
 
+    # Define spatial grid
+    grid = CartesianGrid([[0, 10], [0, 10]], [50, 50])  # 50x50 grid covering 10x10 km
 
+    # Define advection PDE
+    advection_pde = PDE({"c": "-vx * c_x - vy * c_y"}, consts={"vx": 0, "vy": 0})
 
-    # Convert to (x, y) in km
+    # Define spatial positions of Tuindorp and Breukelen
+    x_tuindorp, y_tuindorp = 0, 0  
     x_breukelen, y_breukelen = latlon_to_xy(lat_tuindorp, lon_tuindorp, lat_breukelen, lon_breukelen)
-    x_tuindorp, y_tuindorp = 0, 0  # Set Tuindorp as the origin
 
-    # Time steps from hour 48 to hour 72 (matching physics assumptions)
-    t_eval = np.linspace(0, N_HOURS_Y - 1, N_HOURS_Y)
+    # Function to define the initial condition f_0(x, y)
+    def f0_function(x, y, C_tuindorp):
+        """
+        Defines the initial pollution concentration function using linear interpolation.
+        """
+        # Compute distance of (x, y) along wind direction
+        dist_tuindorp = np.sqrt((x - x_tuindorp) ** 2 + (y - y_tuindorp) ** 2)
+        dist_breukelen = np.sqrt((x_breukelen - x_tuindorp) ** 2 + (y_breukelen - y_tuindorp) ** 2)
+        
+        # Linear interpolation
+        return C_tuindorp * (1 - dist_tuindorp / dist_breukelen)  
 
-    def advection_pde(t, C, vx, vy):
-        """
-        Advection equation: dC/dt + vx * dC/dx + vy * dC/dy = 0
-        We solve it for a single trajectory per batch iteration.
-        """
-        dC_dt = -vx * (C / abs(x_breukelen - x_tuindorp)) - vy * (C / abs(y_breukelen - y_tuindorp))
-        return dC_dt
+    # Time steps from hour 48 to hour 72
+    t_range = N_HOURS_Y - 1
 
     # Initialize y_phy output tensor
     y_phy = torch.zeros((batch_size, N_HOURS_Y, 1), device=u.device)
 
     for b in range(batch_size):
-        # Initial condition: Pollution concentration at Tuindorp at the starting time (hour 48)
-        C0 = u[b, -N_HOURS_Y, no2_idx].cpu().numpy()  # Initial NO2 concentration
+        vx_b = vx[b, -N_HOURS_Y].cpu().numpy()
+        vy_b = vy[b, -N_HOURS_Y].cpu().numpy()
 
-        # Solve PDE numerically using solve_ivp
-        sol = solve_ivp(
-            advection_pde, 
-            (0, N_HOURS_Y - 1),  # Time span
-            [C0],  # Initial condition
-            t_eval=t_eval,  # Evaluation time points
-            args=(vx[b, -N_HOURS_Y].cpu().numpy(), vy[b, -N_HOURS_Y].cpu().numpy())
-        )
+        # Pollution concentration at Tuindorp
+        C_tuindorp = u[b, -N_HOURS_Y, no2_idx].cpu().numpy()
 
-        # Store the result in y_phy
-        # Clamp the values to be within [0, 1] range for backpropagation to match ypred
-        y_phy[b, :, 0] = torch.clamp(torch.tensor(sol.y[0], device=u.device), min=0, max=1)
+        # Create initial concentration field using f0_function
+        C0 = ScalarField.from_expression(grid, lambda x, y: f0_function(x, y, C_tuindorp))
 
-    
+        # Solve PDE
+        advection_pde.consts["vx"] = vx_b
+        advection_pde.consts["vy"] = vy_b
+        result = advection_pde.solve(C0, t_range)
+
+        # Extract pollution level at Breukelen
+        y_phy[b, :, 0] = torch.clamp(torch.tensor(result.data.mean(), device=u.device), min=0, max=1)
+
     return y_phy
+
 
 def compute_pde_numerical_piecewise_y_phy(u):
     """
