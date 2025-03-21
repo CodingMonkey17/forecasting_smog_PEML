@@ -47,16 +47,24 @@ def concat_frames_vertically(dfs: List[pd.DataFrame], keys: List[str]) -> pd.Dat
 
 def make_manual_dict_of_dfs(
         dfs: List[pd.DataFrame], components: List[str]
-    ) -> Dict[str, pd.DataFrame]:
+    ) -> tuple[Dict[str, pd.DataFrame], List[str]]:
     """
     Creates a dictionary of dataframes with the components as keys.
-    Beware: it assumes the same order as the components list!
+    If the component is 'NO2', it splits the dataframe into separate keys
+    for each column (e.g., 'no2_tuindorp' and 'no2_breukelen').
 
     :param dfs: list of dataframes
     :param components: list of components
     :return: created dictionary of dataframes
     """
-    return dict(zip(components, dfs))
+    dfs_dict = {}
+    for df, component in zip(dfs, components):
+        print("component", component)
+        # make a copy of component
+        
+        dfs_dict[component] = df
+    
+    return dfs_dict
 
 
 def sort_dict_of_dfs(
@@ -130,7 +138,7 @@ def concat_frames_horizontally(
     :param components: list of components
     :return: concatenated dataframe
     """
-    dfs_dict = make_manual_dict_of_dfs(dfs, components)
+    dfs_dict= make_manual_dict_of_dfs(dfs, components)
     components_sorted = sorted(components)
     print("before", dfs_dict)
     print(components_sorted)
