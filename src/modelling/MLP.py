@@ -4,6 +4,7 @@ import torch.optim as optim
 import optuna
 from torch.utils.data import DataLoader
 from modelling.loss import *
+import time  # Import time module to measure training time and inference time
 
 
 class BasicMLP(nn.Module):
@@ -40,6 +41,8 @@ class BasicMLP(nn.Module):
 
         best_val_loss = float("inf")
         best_model_state = None
+        # Start timing training
+        start_train_time = time.time()
 
         
 
@@ -83,12 +86,11 @@ class BasicMLP(nn.Module):
 
             print(f"Epoch {epoch+1}/{epochs} - Train Loss: {train_loss:.6f} - Val Loss (simple RMSE, no physics involved): {val_loss:.6f}")
 
+
+        total_train_time = time.time() - start_train_time  # Total training time
         if best_model_state:
             self.load_state_dict(best_model_state)
-
-       
-
-        return best_val_loss
+        return best_val_loss, total_train_time
 
 
     def test_model(self, test_loader, min_value=None, max_value=None, device="cpu"):
@@ -99,6 +101,7 @@ class BasicMLP(nn.Module):
         smape_loss = 0.0
         total_elements = 0
         epsilon = 1e-6  # To prevent division by zero
+        start_test_time = time.time()  # Start timing inference
 
         with torch.no_grad():
             for u, y in test_loader:
@@ -125,8 +128,11 @@ class BasicMLP(nn.Module):
         rmse_loss /= len(test_loader)  # Average over batches
         smape_loss = (smape_loss / total_elements) * 100  # Average over all elements and convert to %
 
+        total_test_time = time.time() - start_test_time  # Total inference time
+        
         print(f"Test MSE Loss: {mse_loss.item():.6f}")
         print(f"Test RMSE Loss: {rmse_loss:.6f}")
         print(f"Test SMAPE Loss: {smape_loss:.6f}%")
+        print(f"Total Inference Time: {total_test_time:.2f} seconds")
 
-        return mse_loss.item(), rmse_loss, smape_loss
+        return mse_loss.item(), rmse_loss, smape_loss, total_test_time
