@@ -1,0 +1,18 @@
+from pathlib import Path
+BASE_DIR = Path.cwd().parents[0] # set it to the root directory of the project, not src
+MODEL_PATH = BASE_DIR /"src" / "results" / "models"
+MINMAX_PATH_2017 = BASE_DIR  / "data" / "data_combined" / "only_2017"/ "pollutants_minmax_2017.csv"
+MINMAX_PATH_ALLYEARS = BASE_DIR  / "data" / "data_combined" / "all_years"/ "pollutants_minmax_allyears.csv"
+DATASET_PATH_2017 = BASE_DIR / "data" / "data_combined" / "only_2017"
+DATASET_PATH_ALLYEARS = BASE_DIR / "data" / "data_combined" / "all_years"
+
+N_HOURS_U = 24 * 3               # number of hours to use for input (number of days * 24 hours)
+N_HOURS_Y = 24                    # number of hours to predict (1 day * 24 hours)
+N_HOURS_STEP = 24                 # "sampling rate" in hours of the data; e.g. 24 
+                                  # means sample an I/O-pair every 24 hours
+                                  # the contaminants and meteorological vars
+
+NO2_TUINDORP_IDX =  5
+NO2_BREUKELEN_IDX =  4
+WIND_DIR_IDX =  0
+WIND_SPEED_IDX =  2

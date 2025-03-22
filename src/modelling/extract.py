@@ -7,19 +7,19 @@ import pandas as pd
 import os
 
 
-def import_csv(filename: str) -> pd.DataFrame:
+def import_csv(filepath: str) -> pd.DataFrame:
     """
     Imports a file from the data/data_combined folder
     
     :param file_name: name of the file to import
     """
-    return pd.read_csv(f'../data/data_combined/{filename}',
+    return pd.read_csv(filepath,
                        index_col = 'DateTime',
                        sep = ';',
                        decimal = '.')
 
 
-def get_dataframes(data_type: str, data_category: str, years: List[int]) -> List[pd.DataFrame]:
+def get_dataframes(data_type: str, data_category: str, years: List[int], dataset_path: str) -> List[pd.DataFrame]:
     """
     Convenience function that based on data_type (= 'train', 'val', 'test')
     and data_category (= 'input' or 'output') returns the associated list of
@@ -32,9 +32,9 @@ def get_dataframes(data_type: str, data_category: str, years: List[int]) -> List
     dataframes = []
     for year in years:
         filename = f'{data_type}_{year}_combined_{data_category}.csv'
-        filepath = f'../data/data_combined/{filename}'
+        filepath = f'{dataset_path}/{filename}'
         if os.path.exists(filepath):
-            dataframes.append(import_csv(filename))
+            dataframes.append(import_csv(filepath))
             print(f"Imported {filename}")
         else:
             print(f"Warning: {filename} does not exist.")

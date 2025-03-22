@@ -22,12 +22,15 @@ class BasicMLP(nn.Module):
 
     def forward(self, u):
         batch_size, seq_length, n_features = u.size()
-        outputs = torch.empty((batch_size, seq_length, self.layers[-1].out_features), device=u.device)
+        outputs = torch.empty((batch_size, seq_length - 1, self.layers[-1].out_features), device=u.device)
 
-        for t in range(seq_length):
-            u_t = u[:, t, :]
+        for t in range(1, seq_length):  # Start from t=1 to use t-1 as input
+            u_t = u[:, t-1, :]  # Use previous timestep input
             y_t = self.layers(u_t)
-            outputs[:, t, :] = y_t
+            outputs[:, t-1, :] = y_t  # Save at t-1 because first output corresponds to t=1
+
+        return outputs[:, -24:, :]  # Predict last 24 hours
+
 
         return outputs[:, -24:, :]  # Predict last 24 hours
 
@@ -58,7 +61,7 @@ class BasicMLP(nn.Module):
 
             train_loss /= len(train_loader)
 
-            rmse_loss = 0.0
+
             # Validation step
             self.eval()
             val_loss = 0.0
@@ -78,7 +81,7 @@ class BasicMLP(nn.Module):
                 best_val_loss = val_loss
                 best_model_state = self.state_dict()
 
-            print(f"Epoch {epoch+1}/{epochs} - Train Loss: {train_loss:.6f} - Val Loss (DD rmse only): {val_loss:.6f}")
+            print(f"Epoch {epoch+1}/{epochs} - Train Loss: {train_loss:.6f} - Val Loss (simple RMSE, no physics involved): {val_loss:.6f}")
 
         if best_model_state:
             self.load_state_dict(best_model_state)
