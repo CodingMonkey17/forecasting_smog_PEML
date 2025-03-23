@@ -32,9 +32,6 @@ class BasicMLP(nn.Module):
 
         return outputs[:, -24:, :]  # Predict last 24 hours
 
-
-        return outputs[:, -24:, :]  # Predict last 24 hours
-
     def train_model(self, train_loader, val_loader, epochs=50, lr=1e-3, weight_decay=1e-6, lambda_phy = 1e-5, device="cpu"):
         self.to(device)
         optimizer = optim.Adam(self.parameters(), lr=lr, weight_decay=weight_decay)
