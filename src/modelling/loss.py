@@ -125,8 +125,62 @@ def compute_pollution_at_breukelen(result, grid, x_breukelen, y_breukelen):
     
     return concentration_breukelen
 
+# Define the initial pollution concentration function
+def get_linear_interpolate(x, y, C_tuindorp, C_breukelen, x_tuindorp, y_tuindorp, x_breukelen, y_breukelen):
+    """
+    Defines the initial pollution concentration function using linear interpolation
+    based on the distances to both Tuindorp and Breukelen.
+    
+    Parameters:
+    - x, y: Coordinates of the current grid point.
+    - C_tuindorp: Pollution level at Tuindorp.
+    - C_breukelen: Pollution level at Breukelen.
+    
+    Returns:
+    - Pollution concentration at (x, y) based on distance-weighted interpolation.
+    """
+    # Calculate distances from the point (x, y) to Tuindorp and Breukelen
+    dist_tuindorp = np.sqrt((x - x_tuindorp) ** 2 + (y - y_tuindorp) ** 2)
+    dist_breukelen = np.sqrt((x - x_breukelen) ** 2 + (y - y_breukelen) ** 2)
+    
+    # Calculate the total distance (just for normalization)
+    total_dist = dist_tuindorp + dist_breukelen
+    
+    # If the total distance is zero (this should happen only at Tuindorp or Breukelen),
+    # we return the corresponding concentration level
+    if total_dist == 0:
+        return C_tuindorp if dist_tuindorp < dist_breukelen else C_breukelen
+    
+    # Linear interpolation: weight pollution levels based on distance
+    weight_tuindorp = dist_breukelen / total_dist  # Closer to Tuindorp means higher weight for C_tuindorp
+    weight_breukelen = dist_tuindorp / total_dist  # Closer to Breukelen means higher weight for C_breukelen
+    
+    # Return the interpolated concentration
+    return weight_tuindorp * C_tuindorp + weight_breukelen * C_breukelen
 
 
+
+def create_pollution_field(grid, C_tuindorp, C_breukelen, x_tuindorp, y_tuindorp, x_breukelen, y_breukelen):
+    """
+    Creates a 2D pollution field using the provided interpolation function.
+
+    Parameters:
+    - grid: CartesianGrid object defining the spatial grid.
+    - f0_function: Function to compute pollution concentration at each grid point.
+    - C_tuindorp: Pollution level at Tuindorp.
+    - C_breukelen: Pollution level at Breukelen.
+    - x_tuindorp, y_tuindorp: Coordinates of Tuindorp.
+    - x_breukelen, y_breukelen: Coordinates of Breukelen.
+
+    Returns:
+    - pollution_values_2d: 2D numpy array representing the pollution field.
+    """
+    pollution_values_2d = np.zeros(grid.shape)
+    for i in range(grid.shape[0]):
+        for j in range(grid.shape[1]):
+            x, y = grid.axes_coords[0][i], grid.axes_coords[1][j]
+            pollution_values_2d[i, j] = get_linear_interpolate(x, y, C_tuindorp, C_breukelen, x_tuindorp, y_tuindorp, x_breukelen, y_breukelen)
+    return pollution_values_2d
 
 def compute_pde_numerical_const_y_phy(u):
     """
@@ -161,15 +215,6 @@ def compute_pde_numerical_const_y_phy(u):
     x_breukelen, y_breukelen = latlon_to_xy(LAT_TUINDORP, LON_TUINDORP, LAT_BREUKELEN, LON_BREUKELEN)
     x_tuindorp, y_tuindorp = 0, 0  # Set Tuindorp as the origin
 
-    # Function to define the initial condition f_0(x, y)
-    def f0_function(x, y, C_tuindorp):
-        """
-        Defines the initial pollution concentration function using linear interpolation.
-        """
-        dist_tuindorp = np.sqrt((x - x_tuindorp) ** 2 + (y - y_tuindorp) ** 2)
-        dist_breukelen = np.sqrt((x_breukelen - x_tuindorp) ** 2 + (y_breukelen - y_tuindorp) ** 2)
-        
-        return C_tuindorp * (1 - dist_tuindorp / dist_breukelen)  # Linear interpolation
 
     # Initialize y_phy output tensor for pollution levels at Breukelen
     y_phy = torch.zeros((batch_size, N_HOURS_Y, 1), device=u.device)
@@ -177,24 +222,26 @@ def compute_pde_numerical_const_y_phy(u):
     # Solve PDE for each batch and extract pollution at Breukelen
     for b in range(batch_size):
         # Pollution concentration at Tuindorp
-        C_tuindorp = u[b, -N_HOURS_Y, NO2_TUINDORP_IDX].cpu().numpy()
+        C_tuindorp = u[b, -N_HOURS_Y -1 , NO2_TUINDORP_IDX].cpu().numpy()
+        C_breukelen = u[b, -N_HOURS_Y -1 , NO2_BREUKELEN_IDX].cpu().numpy()
 
-        # Create initial concentration field using f0_function
-        C0 = ScalarField.from_expression(grid, lambda x, y: f0_function(x, y, C_tuindorp))
+        # Create a 2D pollution field using f0_function
+        pollution_values_2d = create_pollution_field(grid, C_tuindorp, C_breukelen, x_tuindorp, y_tuindorp, x_breukelen, y_breukelen)
+        # Create the ScalarField representing the initial concentration
+        c_m = ScalarField(grid, pollution_values_2d)
 
         # Loop through time steps and solve PDE for each time step
         for t in range(N_HOURS_Y):
             
             # Use the same wind velocity for the entire grid
-            advection_pde.consts["vx"] = vx[b, -N_HOURS_Y].cpu().numpy()
-            advection_pde.consts["vy"] = vy[b, -N_HOURS_Y].cpu().numpy()
+            advection_pde.consts["vx"] = vx[b, -N_HOURS_Y -1].cpu().numpy()
+            advection_pde.consts["vy"] = vy[b, -N_HOURS_Y -1].cpu().numpy()
 
             # Solve PDE for the current time step
-            result = advection_pde.solve(C0, t_range = t, dt = 0.1)
+            result = advection_pde.solve(c_m, t_range = t, dt = 0.1)
 
             # Extract pollution concentration at Breukelen for the current time step
-            concentration_at_breukelen = compute_pollution_at_breukelen(result, grid, x_breukelen, y_breukelen)
-            y_phy[b, t, 0] = concentration_at_breukelen
+            y_phy[b, t, 0] = compute_pollution_at_breukelen(result, grid, x_breukelen, y_breukelen)
 
     return y_phy
 
@@ -294,7 +341,7 @@ def compute_loss(y_pred, y_true, u, loss_function, lambda_phy):
         total_weighted_loss = compute_weighted_total_loss(basic_mse_loss, phy_loss, lambda_phy, u) # L = L_mse + lambda_phy * L_phy
         return total_weighted_loss
         
-    elif loss_function == "Physics_PDE_numerical_constant":
+    elif loss_function == "PDE_nmer_const":
         # after training the y_phy with pde, we can use it to compute the loss
         # Assuming y_train is your ground truth training labels
 
@@ -304,9 +351,7 @@ def compute_loss(y_pred, y_true, u, loss_function, lambda_phy):
         total_weighted_loss = compute_weighted_total_loss(basic_mse_loss, phy_loss, lambda_phy, u)
 
 
-        print("Phy loss", phy_loss)
-        print("MSE loss", basic_mse_loss)
-        print("total_weighted_loss", total_weighted_loss)
+        
         return total_weighted_loss
     elif loss_function == "Physics_PDE_numerical_piecewise":
         # print("Computing loss for Physics_PDE_numerical_piecewise")

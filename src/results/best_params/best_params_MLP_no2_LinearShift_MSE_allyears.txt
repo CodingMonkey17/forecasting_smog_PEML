@@ -1,6 +1,8 @@
-n_hidden_layers: 3
-n_hidden_units: 201
-lr: 0.00013655206277505007
-weight_decay: 2.9657486231251276e-06
-batch_size: 8
-lambda_phy: 0.0002330713151186184
+{
+    "n_hidden_layers": 3,
+    "n_hidden_units": 201,
+    "lr": 0.00013655206277505007,
+    "weight_decay": 2.9657486231251276e-06,
+    "batch_size": 8,
+    "lambda_phy": 0.0002330713151186184
+}
