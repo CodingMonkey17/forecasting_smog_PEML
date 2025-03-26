@@ -182,6 +182,14 @@ def create_pollution_field(grid, C_tuindorp, C_breukelen, x_tuindorp, y_tuindorp
             pollution_values_2d[i, j] = get_linear_interpolate(x, y, C_tuindorp, C_breukelen, x_tuindorp, y_tuindorp, x_breukelen, y_breukelen)
     return pollution_values_2d
 
+
+# Example min-max scaling function (you can adjust this to your specific requirements)
+def min_max_scale(arr):
+    # Normalize the array to the range [0, 1]
+    min_val = np.min(arr)
+    max_val = np.max(arr)
+    return (arr - min_val) / (max_val - min_val)  # Scaled to [0, 1]
+
 def compute_pde_numerical_const_y_phy(u):
     """
     Computes y_phy using the numerical solution of the advection PDE using PyPDE.
@@ -199,17 +207,28 @@ def compute_pde_numerical_const_y_phy(u):
     wind_speed = u[:, :, WIND_SPEED_IDX]  
     wind_direction = u[:, :, WIND_DIR_IDX] * 360  
 
+    # Convert wind speed from m/s to km/h
     wind_speed_kmh = wind_speed * 3.6  
 
     # Compute wind velocity components (vx, vy)
     vx = wind_speed_kmh * torch.cos(torch.deg2rad(wind_direction))  
-    vy = wind_speed_kmh * torch.sin(torch.deg2rad(wind_direction))  
+    vy = wind_speed_kmh * torch.sin(torch.deg2rad(wind_direction))
+
+    # Apply Min-Max Scaling to the computed velocity components (vx, vy)
+    vx_min = vx.min()
+    vx_max = vx.max()
+    vy_min = vy.min()
+    vy_max = vy.max()
+
+    vx = (vx - vx_min) / (vx_max - vx_min)
+    vy = (vy - vy_min) / (vy_max - vy_min)
+
 
     # Define spatial grid for a region of 15x15 km (adjust based on domain)
     grid = CartesianGrid([[-10, 5], [0, 15]], [100, 100])  # 100x100 grid covering -10 to 5 km along x and 0 to 15 km along y
 
     # Define advection PDE
-    advection_pde = PDE({"c": "-vx * c_x - vy * c_y"}, consts={"vx": 0, "vy": 0})
+    advection_pde = PDE({"c": "- vx * d_dx(c) - vy * d_dy(c)"}, consts={"vx": 0, "vy": 0})
 
     # Convert to (x, y) in km
     x_breukelen, y_breukelen = latlon_to_xy(LAT_TUINDORP, LON_TUINDORP, LAT_BREUKELEN, LON_BREUKELEN)
@@ -224,6 +243,7 @@ def compute_pde_numerical_const_y_phy(u):
         # Pollution concentration at Tuindorp
         C_tuindorp = u[b, -N_HOURS_Y -1 , NO2_TUINDORP_IDX].cpu().numpy()
         C_breukelen = u[b, -N_HOURS_Y -1 , NO2_BREUKELEN_IDX].cpu().numpy()
+        print(f"Batch number {b}; C_tuindorp: {C_tuindorp}; C_breukelen: {C_breukelen}")
 
         # Create a 2D pollution field using f0_function
         pollution_values_2d = create_pollution_field(grid, C_tuindorp, C_breukelen, x_tuindorp, y_tuindorp, x_breukelen, y_breukelen)
@@ -234,15 +254,18 @@ def compute_pde_numerical_const_y_phy(u):
         for t in range(N_HOURS_Y):
             
             # Use the same wind velocity for the entire grid
-            advection_pde.consts["vx"] = vx[b, -N_HOURS_Y -1].cpu().numpy()
-            advection_pde.consts["vy"] = vy[b, -N_HOURS_Y -1].cpu().numpy()
+            advection_pde.consts["vx"] = float(vx[b, -N_HOURS_Y -1].cpu().numpy())
+            advection_pde.consts["vy"] = float(vy[b, -N_HOURS_Y -1].cpu().numpy())
 
             # Solve PDE for the current time step
-            result = advection_pde.solve(c_m, t_range = t, dt = 0.1)
+            result = advection_pde.solve(c_m, t_range=t, tracker = None)
 
-            # Extract pollution concentration at Breukelen for the current time step
+            c_m.data = result.data
+            #current time step
             y_phy[b, t, 0] = compute_pollution_at_breukelen(result, grid, x_breukelen, y_breukelen)
-
+            print("computed y phy for batch", b, "and time step", t, ":", y_phy[b, t, 0])
+    # After all y_phy values are computed, apply min-max scaling to the entire batch
+    print("y_phy", y_phy)
     return y_phy
 
 
