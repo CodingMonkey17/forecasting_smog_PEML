@@ -46,13 +46,18 @@ class BasicMLP(nn.Module):
         for epoch in range(epochs):
             self.train()
             train_loss = 0.0
+            # load y_phy file 
             print(f"Epoch {epoch+1}/{epochs}")
+
+            #loop with batch idx too
             for u, y in train_loader:
                 u, y = u.to(device), y.to(device)
                 optimizer.zero_grad()
 
                 output = self.forward(u)
-                
+                #y_phy = all_y_phy[batch_idx]
+                #parse in y_phy in compute loss
+                #make sure to keep it none if not used
                 loss= compute_loss(output, y, u, self.loss_function, lambda_phy = lambda_phy)  # Compute loss based on selected function
 
                 loss.backward()

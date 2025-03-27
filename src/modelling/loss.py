@@ -6,9 +6,7 @@ from torch.utils.data import DataLoader
 from scipy.integrate import solve_ivp
 import numpy as np
 import math
-from sklearn.preprocessing import MinMaxScaler
 from pde import CartesianGrid, ScalarField, VectorField, PDE
-from scipy.interpolate import interp1d
 import config
 from config import *
 
