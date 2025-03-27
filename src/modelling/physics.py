@@ -159,8 +159,8 @@ def precompute_y_phy_for_all_batches_eq1(
 
         for b in range(batch_size):
             # Extract the intitial pollution levels at Tuindorp and Breukelen at 1 hour before prediction
-            C_tuindorp = u[b, -N_HOURS_Y - 1, NO2_TUINDORP_IDX].cpu().numpy()
-            C_breukelen = u[b, -N_HOURS_Y - 1, NO2_BREUKELEN_IDX].cpu().numpy()
+            C_tuindorp = u[b, -N_HOURS_Y - 1, NO2_TUINDORP_IDX].numpy()
+            C_breukelen = u[b, -N_HOURS_Y - 1, NO2_BREUKELEN_IDX].numpy()
 
             # create pollution field with grid and initial pollution values
             pollution_values_2d = create_pollution_field(grid, C_tuindorp, C_breukelen, x_tuindorp, y_tuindorp, x_breukelen, y_breukelen)
@@ -168,8 +168,8 @@ def precompute_y_phy_for_all_batches_eq1(
 
             for t in range(N_HOURS_Y):
                 # Assign the wind velocity of 1 hour before the prediction
-                advection_pde.consts["vx"] = float(vx[b, -N_HOURS_Y - 1].cpu().numpy())
-                advection_pde.consts["vy"] = float(vy[b, -N_HOURS_Y - 1].cpu().numpy())
+                advection_pde.consts["vx"] = float(vx[b, -N_HOURS_Y - 1].numpy())
+                advection_pde.consts["vy"] = float(vy[b, -N_HOURS_Y - 1].numpy())
 
                 # solve the pde and update c_m for the next timestep
                 result = advection_pde.solve(c_m, t_range=t, dt = 0.001, tracker=None)
