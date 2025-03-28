@@ -7,9 +7,10 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 import math
 import numpy as np
+import pickle
 
 # Function to compute pollution concentration at Breukelen
-def compute_pollution_at_breukelen(result, grid, x_breukelen, y_breukelen):
+def compute_pollution_at_breukelen(result_data, grid, x_breukelen, y_breukelen):
     """
     Given the PDE result, extract the pollution concentration at Breukelen's location.
     """
@@ -18,7 +19,7 @@ def compute_pollution_at_breukelen(result, grid, x_breukelen, y_breukelen):
     y_idx = np.abs(grid.axes_coords[1] - y_breukelen).argmin()  # Find closest index on y-axis
     
     # Extract the pollution concentration at Breukelen's grid point
-    concentration_breukelen = result.data[x_idx, y_idx]  # Get value from result grid
+    concentration_breukelen = result_data[x_idx, y_idx]  # Get value from result grid
     
     return concentration_breukelen
 
@@ -122,7 +123,7 @@ def latlon_to_xy(lat1, lon1, lat2, lon2):
 
 def precompute_y_phy_for_all_batches_eq1(
     dataset_loader,
-    output_file="y_phy_tensor.pt", log_dir="runs/y_phy_tracking"
+    output_file="output.pkl", log_dir="runs/y_phy_tracking"
 ):
     """
     Precompute y_phy for all batches, save to a file, and log progress with TensorBoard.
@@ -139,6 +140,8 @@ def precompute_y_phy_for_all_batches_eq1(
     
     writer = SummaryWriter(log_dir=log_dir)
     all_y_phy = []
+    with open("physics_outputs/testing_empty.pkl", "wb") as f:
+        pickle.dump(all_y_phy, f)
     # Step 1: Compute global min/max values
     vx_min, vx_max, vy_min, vy_max = compute_global_min_max_vx_vy(dataset_loader)
     # Convert to (x, y) in km
@@ -158,6 +161,8 @@ def precompute_y_phy_for_all_batches_eq1(
         vx, vy = get_scaled_vx_vy(u, vx_min, vx_max, vy_min, vy_max)
 
         for b in range(batch_size):
+            print(f"Processing batch {batch_idx + 1}/{len(dataset_loader)}, sample {b + 1}/{batch_size}")
+            
             # Extract the intitial pollution levels at Tuindorp and Breukelen at 1 hour before prediction
             C_tuindorp = u[b, -N_HOURS_Y - 1, NO2_TUINDORP_IDX].numpy()
             C_breukelen = u[b, -N_HOURS_Y - 1, NO2_BREUKELEN_IDX].numpy()
@@ -172,20 +177,24 @@ def precompute_y_phy_for_all_batches_eq1(
                 advection_pde.consts["vy"] = float(vy[b, -N_HOURS_Y - 1].numpy())
 
                 # solve the pde and update c_m for the next timestep
-                result = advection_pde.solve(c_m, t_range=t, dt = 0.001, tracker=None)
-                c_m.data = result.data
+                result_data = advection_pde.solve(c_m, t_range=t, dt = 0.001, tracker=None).data
+                c_m.data = result_data
 
                 # Compute calculated pollution concentration from the grid at Breukelens coordinates
-                y_phy_batch[b, t, 0] = compute_pollution_at_breukelen(result, grid, x_breukelen, y_breukelen)
+                y_phy_batch[b, t, 0] = compute_pollution_at_breukelen(result_data, grid, x_breukelen, y_breukelen)
 
                 # Log some values to TensorBoard
                 if b % 5 == 0 and t % 2 == 0:  # Reduce logging overhead
                     writer.add_scalar("y_phy/value", y_phy_batch[b, t, 0].item(), global_step=(batch_idx * batch_size + b) * N_HOURS_Y + t)
-
+            del result_data
+            del c_m
         all_y_phy.append(y_phy_batch)
+        del y_phy_batch
 
-    all_y_phy = torch.cat(all_y_phy, dim=0)
-    torch.save(all_y_phy, output_file)
+    
+        # Save as .pkl file
+    with open(output_file, "wb") as f:
+        pickle.dump(all_y_phy, f)
     print(f"y_phy for all batches saved to {output_file}")
 
     writer.close()
