@@ -32,16 +32,15 @@ class BasicMLP(nn.Module):
 
         return outputs[:, -24:, :]  # Predict last 24 hours
 
-    def train_model(self, train_loader, val_loader, epochs=50, lr=1e-3, weight_decay=1e-6, lambda_phy = 1e-5, device="cpu"):
+    def train_model(self, train_loader, val_loader, all_y_phy = None, epochs=50, lr=1e-3, weight_decay=1e-6, lambda_phy = 1e-5, device="cpu"):
         self.to(device)
         optimizer = optim.Adam(self.parameters(), lr=lr, weight_decay=weight_decay)
 
         best_val_loss = float("inf")
         best_model_state = None
         # Start timing training
-        start_train_time = time.time()
 
-        
+        start_train_time = time.time()
 
         for epoch in range(epochs):
             self.train()
@@ -50,15 +49,12 @@ class BasicMLP(nn.Module):
             print(f"Epoch {epoch+1}/{epochs}")
 
             #loop with batch idx too
-            for u, y in train_loader:
+            for batch_idx, (u, y) in enumerate(train_loader):
                 u, y = u.to(device), y.to(device)
                 optimizer.zero_grad()
 
                 output = self.forward(u)
-                #y_phy = all_y_phy[batch_idx]
-                #parse in y_phy in compute loss
-                #make sure to keep it none if not used
-                loss= compute_loss(output, y, u, self.loss_function, lambda_phy = lambda_phy)  # Compute loss based on selected function
+                loss= compute_loss(output, y, u, self.loss_function, lambda_phy = lambda_phy, all_y_phy = all_y_phy, batch_idx = batch_idx)  # Compute loss based on selected function
 
                 loss.backward()
                 optimizer.step()
@@ -98,11 +94,12 @@ class BasicMLP(nn.Module):
     def test_model(self, test_loader, min_value=None, max_value=None, device="cpu"):
         self.to(device)
         self.eval()
-        mse_loss_fn = nn.MSELoss()
+        mse_loss_fn =nn.MSELoss(reduction="mean")
         rmse_loss = 0.0
         smape_loss = 0.0
         total_elements = 0
         epsilon = 1e-6  # To prevent division by zero
+        total_mse_loss = 0.0 
         start_test_time = time.time()  # Start timing inference
 
         with torch.no_grad():
@@ -122,12 +119,16 @@ class BasicMLP(nn.Module):
                 if min_value is not None and max_value is not None:
                     output = output * (max_value - min_value) + min_value
                     y = y * (max_value - min_value) + min_value
+                output = output.to(torch.float64)
+                y = y.to(torch.float64)
 
                 mse_loss = mse_loss_fn(output, y)
-                rmse_loss += torch.sqrt(mse_loss).item()
+                total_mse_loss += mse_loss.item()  # Sum up MSE
+        
+        # Final RMSE calculation: take the square root of the mean MSE
+        mean_mse = total_mse_loss / len(test_loader)  # Mean MSE over batches
+        rmse_loss = mean_mse ** 0.5
 
-        # Final loss calculations
-        rmse_loss /= len(test_loader)  # Average over batches
         smape_loss = (smape_loss / total_elements) * 100  # Average over all elements and convert to %
 
         total_test_time = time.time() - start_test_time  # Total inference time

@@ -1,7 +1,7 @@
 {
-    'n_hidden_layers': 5,
-    'n_hidden_units': 163,
-    'lr': 0.0031656932205590947,
-    'weight_decay': 3.408518000104593e-06,
-    'batch_size': 16
+    "n_hidden_layers": 5,
+    "n_hidden_units": 163,
+    "lr": 0.0031656932205590947,
+    "weight_decay": 3.408518000104593e-06,
+    "batch_size": 16
 }
