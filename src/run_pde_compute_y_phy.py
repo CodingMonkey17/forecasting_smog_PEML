@@ -1,7 +1,7 @@
 # %% [markdown]
 # # **PEML MLP Architecture 1 - computing physics output and feed in NN with regularisation**
 # ## Experiment 2 - Eq 1: y_phy calculated by solving pde constant advection equation
-# ### Only 2017 data
+# ### All years data
 
 # %% [markdown]
 # ## **Running the models using the 'modelling' package**
@@ -43,6 +43,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from torch.utils.data import ConcatDataset
+import pickle
 
 # %% [markdown]
 # Use GPU when available
@@ -86,10 +87,10 @@ torch.manual_seed(34)             # set seed for reproducibility
 # %%
 # Change this according to the data you want to use
 # Change this according to the data you want to use
-YEARS = [2017]
-TRAIN_YEARS = [2017]
-VAL_YEARS = [2017]
-TEST_YEARS = [2017]
+YEARS = [2017, 2018, 2020, 2021, 2022, 2023]
+TRAIN_YEARS = [2017, 2018, 2020, 2021, 2022]
+VAL_YEARS = [2021, 2022, 2023]
+TEST_YEARS = [2021, 2022, 2023]
 
 LOSS_FUNC = "PDE_nmer_const" # PDE numerical solver with equation 1, of constant wind speed and direction
 NN_TYPE = "MLP" # choose from "MLP", "RNN", "LSTM", "GRU"
@@ -100,6 +101,7 @@ if YEARS == [2017, 2018, 2020, 2021, 2022, 2023]:
     years = "allyears"
     MINMAX_PATH = MINMAX_PATH_ALLYEARS
     DATASET_PATH = DATASET_PATH_ALLYEARS
+
     
     print("Using all years")
     
@@ -111,11 +113,14 @@ elif YEARS == [2017]:
 else:
     raise ValueError("Invalid years selected")
 
-
+Y_PHY_FILENAME = f"y_phy_batchsize16_{LOSS_FUNC}_{years}.pkl"
 MODEL_PATH_NAME = f'best_{NN_TYPE}_no2_{LOSS_FUNC}_{years}.pth'
 RESULTS_METRICS_FILENAME = f'results_{NN_TYPE}_no2_{LOSS_FUNC}_{years}.csv'
 BESTPARAMS_FILENAME = f'best_params_{NN_TYPE}_no2_{LOSS_FUNC}_{years}.txt'
 PLOT_FILENAME = f'plot_{NN_TYPE}_no2_{LOSS_FUNC}_{years}.png'
+
+
+print("Y_PHY_FILENAME", Y_PHY_FILENAME)
 print("MINMAX_PATH: ", MINMAX_PATH)
 print("DATASET_PATH: ", DATASET_PATH)
 print("MODEL_PATH_NAME: ", MODEL_PATH_NAME)
@@ -224,20 +229,20 @@ train_dataset.u[0].iloc[:,WIND_DIR_IDX]
 train_dataset.u[0].iloc[:,WIND_SPEED_IDX]
 
 # %% [markdown]
-# ## Tuning Hyperparamters
+# ## Computing y_phy 2017 with eq 1 PDE numerical solver
 
-# %%
-print("tuning with loss function: ", LOSS_FUNC)
-print("tuning with nn type: ", NN_TYPE)
-
-# %%
-batch_size = 16
+# %% [markdown]
+# ### Computing from Habrok since it takes a long time (ran by converting this notebook to script -> interactive)
 
 # %%
 # Create train & validation loaders (following the original code)
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+temp_batch_size = 16
+temp_train_loader = DataLoader(train_dataset, batch_size=temp_batch_size, shuffle=True)
+temp_val_loader = DataLoader(val_dataset, batch_size=temp_batch_size, shuffle=False)
+phy_path = f"{PHY_OUTPUT_PATH}/{Y_PHY_FILENAME}"
+print("phy_path: ", phy_path)
+precompute_y_phy_for_all_batches_eq1(temp_train_loader, output_file = phy_path)
 
-# %%
-precompute_y_phy_for_all_batches_eq1(train_loader, output_file = "physics_outputs/y_phy_eq1.pt")
+
+
 
