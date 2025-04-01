@@ -150,7 +150,7 @@ def precompute_y_phy_for_all_batches_eq1(
 
     advection_pde = PDE({"c": "- vx * d_dx(c) - vy * d_dy(c)"}, consts={"vx": 0, "vy": 0})
     # Define spatial grid for a region of 15x15 km (adjust based on domain)
-    grid = CartesianGrid([[-10, 5], [0, 15]], [100, 100])  # 100x100 grid covering -10 to 5 km along x and 0 to 15 km along y
+    grid = CartesianGrid([[-10, 5], [0, 15]], [20, 20])  # 20x20 grid covering -10 to 5 km along x and 0 to 15 km along y
 
     
     for batch_idx, (u, _) in enumerate(dataset_loader):
@@ -200,3 +200,20 @@ def precompute_y_phy_for_all_batches_eq1(
     writer.close()
 
 
+def load_all_y_phy(loss_function):
+    """
+    Load all y_phy values for the entire dataset.
+    - loss_function: "MSE" or "Physics_Linear_MSE" or "PDE_nmer_const" or "Physics_PDE_numerical_piecewise"
+
+    Returns: List of all y_phy values for the entire dataset.
+    """
+    all_y_phy = []
+
+    if loss_function == "PDE_nmer_const":
+        with open("physics_outputs/y_phy_batchsize16_eq1_2017.pkl", "rb") as f:
+            all_y_phy = pickle.load(f)
+    elif loss_function == "Physics_PDE_numerical_piecewise":
+        # Load y_phy values from file
+        all_y_phy = torch.load("data/y_phy_pde_numerical_piecewise.pt")
+
+    return all_y_phy
