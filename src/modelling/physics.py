@@ -188,6 +188,7 @@ def precompute_y_phy_for_all_batches_eq1(
                     writer.add_scalar("y_phy/value", y_phy_batch[b, t, 0].item(), global_step=(batch_idx * batch_size + b) * N_HOURS_Y + t)
             del result_data
             del c_m
+            del pollution_values_2d
         all_y_phy.append(y_phy_batch)
         del y_phy_batch
 

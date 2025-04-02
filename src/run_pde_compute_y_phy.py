@@ -113,7 +113,7 @@ elif YEARS == [2017]:
 else:
     raise ValueError("Invalid years selected")
 
-Y_PHY_FILENAME = f"y_phy_batchsize16_{LOSS_FUNC}_{years}.pkl"
+Y_PHY_FILENAME = f"y_phy_batchsize16_{LOSS_FUNC}_{years}"
 MODEL_PATH_NAME = f'best_{NN_TYPE}_no2_{LOSS_FUNC}_{years}.pth'
 RESULTS_METRICS_FILENAME = f'results_{NN_TYPE}_no2_{LOSS_FUNC}_{years}.csv'
 BESTPARAMS_FILENAME = f'best_params_{NN_TYPE}_no2_{LOSS_FUNC}_{years}.txt'
@@ -233,16 +233,35 @@ train_dataset.u[0].iloc[:,WIND_SPEED_IDX]
 
 # %% [markdown]
 # ### Computing from Habrok since it takes a long time (ran by converting this notebook to script -> interactive)
+from itertools import islice
+
+def get_dataloader_chunk(dataloader, start, end):
+    """Extracts a chunk of the DataLoader from start to end."""
+    return list(islice(dataloader, start, end))
+
 
 # %%
 # Create train & validation loaders (following the original code)
 temp_batch_size = 16
 temp_train_loader = DataLoader(train_dataset, batch_size=temp_batch_size, shuffle=True)
 temp_val_loader = DataLoader(val_dataset, batch_size=temp_batch_size, shuffle=False)
-phy_path = f"{PHY_OUTPUT_PATH}/{Y_PHY_FILENAME}"
-print("phy_path: ", phy_path)
-precompute_y_phy_for_all_batches_eq1(temp_train_loader, output_file = phy_path)
+# Extract different batch chunks manually
+first_10_batches = get_dataloader_chunk(temp_train_loader, 0, 10)
+second_10_batches = get_dataloader_chunk(temp_train_loader, 10, 20)
+third_10_batches = get_dataloader_chunk(temp_train_loader, 20, 30)
+fourth_10_batches = get_dataloader_chunk(temp_train_loader, 30, 41)
+print(f"First 10 batches count: {len(first_10_batches)}")
+print(f"Second 10 batches count: {len(second_10_batches)}")
+print(f"Third 10 batches count: {len(third_10_batches)}")
+print(f"Fourth batch count: {len(fourth_10_batches)} (should be 11 if dataset has 41 batches)")
+
+
+phy_path = f"{PHY_OUTPUT_PATH}/{Y_PHY_FILENAME}_1.pkl"
+print("first 10 batches phy_path: ", phy_path)
+# precompute_y_phy_for_all_batches_eq1(first_10_batches, output_file = phy_path)
 
 
 
 
+
+# %%
