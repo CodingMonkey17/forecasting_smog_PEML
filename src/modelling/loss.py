@@ -335,19 +335,10 @@ def compute_pde_numerical_piecewise_y_phy(u):
 
     return y_phy
 
-def get_y_phy_batch(y_pred, all_y_phy, batch_idx):
-    batch_size = y_pred.shape[0]  # Dynamically get batch size from y_pred
+def get_y_phy_batch(all_y_phy, batch_idx):
 
-    # Extract the correct batch from all_y_phy
-    batch_start = batch_idx * batch_size
-    batch_end = batch_start + batch_size
-
-    if batch_end > all_y_phy.shape[0]:  # Handle last batch
-        y_phy = all_y_phy[batch_start:]  
-    else:
-        y_phy = all_y_phy[batch_start:batch_end]
     
-    return y_phy
+    return all_y_phy[batch_idx]
     
 
 # Computing loss for tuning, training, testing the model for actual prediction
@@ -380,8 +371,9 @@ def compute_loss(y_pred, y_true, u, loss_function, lambda_phy, all_y_phy, batch_
         if all_y_phy is None:
             print("Error: all_y_phy is None. Please load the y_phy values first.")
             return None
-        y_phy = get_y_phy_batch(y_pred, all_y_phy, batch_idx)
+        y_phy = get_y_phy_batch(all_y_phy, batch_idx)
         # Compute the loss
+
         phy_loss = mse_loss(y_pred, y_phy)
         total_weighted_loss = compute_weighted_total_loss(basic_mse_loss, phy_loss, lambda_phy, u)
 
