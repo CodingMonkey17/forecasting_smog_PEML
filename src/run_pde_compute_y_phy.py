@@ -1,6 +1,6 @@
 # %% [markdown]
 # # **PEML MLP Architecture 1 - computing physics output and feed in NN with regularisation**
-# ## Experiment 2 - Eq 1: y_phy calculated by solving pde constant advection equation
+# ## Experiment 2 - Eq 2: y_phy calculated by solving pde Piecewise constant advection equation
 # ### All years data
 
 # %% [markdown]
@@ -92,7 +92,7 @@ TRAIN_YEARS = [2017, 2018, 2020, 2021, 2022]
 VAL_YEARS = [2021, 2022, 2023]
 TEST_YEARS = [2021, 2022, 2023]
 
-LOSS_FUNC = "PDE_nmer_const" # PDE numerical solver with equation 1, of constant wind speed and direction
+LOSS_FUNC = "PDE_nmer_piece" # PDE numerical solver with equation 1, of constant wind speed and direction
 NN_TYPE = "MLP" # choose from "MLP", "RNN", "LSTM", "GRU"
 torch.random.manual_seed(34)
 
@@ -233,6 +233,9 @@ train_dataset.u[0].iloc[:,WIND_SPEED_IDX]
 
 # %% [markdown]
 # ### Computing from Habrok since it takes a long time (ran by converting this notebook to script -> interactive)
+# ### Also ran this in 4 chunks (10 batches for first 3 chunks, and 11 batches for last chunk) due to OOM on Habrok
+
+# %%
 from itertools import islice
 
 def get_dataloader_chunk(dataloader, start, end):
@@ -243,13 +246,18 @@ def get_dataloader_chunk(dataloader, start, end):
 # %%
 # Create train & validation loaders (following the original code)
 temp_batch_size = 16
+# Extract different batch chunks manually
 temp_train_loader = DataLoader(train_dataset, batch_size=temp_batch_size, shuffle=True)
 temp_val_loader = DataLoader(val_dataset, batch_size=temp_batch_size, shuffle=False)
-# Extract different batch chunks manually
+print("Train loader length: ", len(temp_train_loader))
+
+# %%
 first_10_batches = get_dataloader_chunk(temp_train_loader, 0, 10)
 second_10_batches = get_dataloader_chunk(temp_train_loader, 10, 20)
 third_10_batches = get_dataloader_chunk(temp_train_loader, 20, 30)
 fourth_10_batches = get_dataloader_chunk(temp_train_loader, 30, 41)
+print(f"length of dataloader: {len(temp_train_loader)}")
+
 print(f"First 10 batches count: {len(first_10_batches)}")
 print(f"Second 10 batches count: {len(second_10_batches)}")
 print(f"Third 10 batches count: {len(third_10_batches)}")
@@ -258,10 +266,62 @@ print(f"Fourth batch count: {len(fourth_10_batches)} (should be 11 if dataset ha
 
 phy_path = f"{PHY_OUTPUT_PATH}/{Y_PHY_FILENAME}_1.pkl"
 print("first 10 batches phy_path: ", phy_path)
-# precompute_y_phy_for_all_batches_eq1(first_10_batches, output_file = phy_path)
+precompute_y_phy_for_all_batches_eq2(all_dataset_loader= temp_train_loader, chunk_dataset_loader=first_10_batches, output_file = phy_path)
 
 
 
+# # %%
+# all_y_phy = load_all_y_phy(PHY_OUTPUT_PATH, Y_PHY_FILENAME)
+# # Save into one combined pickle file
+# combined_file = f"{PHY_OUTPUT_PATH}/{Y_PHY_FILENAME}_full.pkl"
+# with open(combined_file, "wb") as f:
+#     pickle.dump(all_y_phy, f)
+
+# print(f"Combined y_phy saved to: {combined_file}")
+# print(f"Total number of batches: {len(all_y_phy)}")
 
 
-# %%
+# # %%
+# # Path to the full saved file
+# combined_file = f"{PHY_OUTPUT_PATH}/{Y_PHY_FILENAME}_full.pkl"
+
+# # Load it
+# with open(combined_file, "rb") as f:
+#     all_y_phy = pickle.load(f)
+
+# # Check total batches and shape of first batch
+# print(f"Total batches: {len(all_y_phy)}")
+# print(f"Shape of first batch: {all_y_phy[0].shape}")
+
+# %% [markdown]
+# ### Moved the y_phy file computed from habrok to local
+# ### Loading the computed y_phy
+
+# # %%
+# # Load it back
+# combined_phy_path = f"{PHY_OUTPUT_PATH}/{Y_PHY_FILENAME}_full.pkl"
+# print(f"Loading y_phy from file {combined_phy_path}")
+
+# with open(combined_phy_path, "rb") as f:
+#     all_y_phy_np = pickle.load(f)  # List of tensors
+# # Convert each batch to a torch tensor (keep as a list)
+# all_y_phy = [torch.from_numpy(batch) for batch in all_y_phy_np]
+
+# print(f"Number of batches in all_y_phy: {len(all_y_phy)}")
+
+# print(f"all_y_phy first batch shape: {all_y_phy[0].shape}")
+
+# # %% [markdown]
+# # ### Confirming the computing y_phy has same shape as the y_true 
+
+# # %%
+# for i, (data, output) in enumerate(temp_train_loader):  # train_loader yields (input_data, labels)
+
+#     y_phy_batch = all_y_phy[i]  # Get corresponding precomputed physics output
+#     # Compare shapes
+#     if output.shape == y_phy_batch.shape:
+#         print(f"Batch {i} matches shape: {output.shape}, y_phy {y_phy_batch.shape}")
+#     else:
+#         print(f"Batch {i} shape mismatch: train_loader {output.shape}, y_phy {y_phy_batch.shape}")
+
+

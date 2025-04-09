@@ -366,7 +366,7 @@ def compute_loss(y_pred, y_true, u, loss_function, lambda_phy, all_y_phy, batch_
         total_weighted_loss = compute_weighted_total_loss(basic_mse_loss, phy_loss, lambda_phy, u) # L = L_mse + lambda_phy * L_phy
         return total_weighted_loss
         
-    elif loss_function == "PDE_nmer_const":
+    elif loss_function == "PDE_nmer_const" or loss_function == "PDE_nmer_piece":
         # Ensure y_phy is loaded
         if all_y_phy is None:
             print("Error: all_y_phy is None. Please load the y_phy values first.")
@@ -380,13 +380,3 @@ def compute_loss(y_pred, y_true, u, loss_function, lambda_phy, all_y_phy, batch_
 
         return total_weighted_loss
         
-    elif loss_function == "Physics_PDE_numerical_piecewise":
-        # print("Computing loss for Physics_PDE_numerical_piecewise")
-        y_phy = compute_pde_numerical_piecewise_y_phy(u=u)
-        phy_loss = mse_loss(y_pred, y_phy)
-        total_weighted_loss = compute_weighted_total_loss(basic_mse_loss, phy_loss, lambda_phy, u)
-
-        print("Phy loss", phy_loss)
-        print("MSE loss", basic_mse_loss)
-        print("total_weighted_loss", total_weighted_loss)
-        return total_weighted_loss

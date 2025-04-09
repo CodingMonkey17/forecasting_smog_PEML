@@ -122,7 +122,7 @@ def latlon_to_xy(lat1, lon1, lat2, lon2):
 
 
 def precompute_y_phy_for_all_batches_eq1(
-    dataset_loader,
+    all_dataset_loader, chunk_dataset_loader,
     output_file="output.pkl", log_dir="runs/y_phy_tracking"
 ):
     """
@@ -143,7 +143,7 @@ def precompute_y_phy_for_all_batches_eq1(
     with open("physics_outputs/testing_empty.pkl", "wb") as f:
         pickle.dump(all_y_phy, f)
     # Step 1: Compute global min/max values
-    vx_min, vx_max, vy_min, vy_max = compute_global_min_max_vx_vy(dataset_loader)
+    vx_min, vx_max, vy_min, vy_max = compute_global_min_max_vx_vy(all_dataset_loader)
     # Convert to (x, y) in km
     x_breukelen, y_breukelen = latlon_to_xy(LAT_TUINDORP, LON_TUINDORP, LAT_BREUKELEN, LON_BREUKELEN)
     x_tuindorp, y_tuindorp = 0, 0  # Set Tuindorp as the origin
@@ -153,15 +153,15 @@ def precompute_y_phy_for_all_batches_eq1(
     grid = CartesianGrid([[-10, 5], [0, 15]], [20, 20])  # 20x20 grid covering -10 to 5 km along x and 0 to 15 km along y
 
     
-    for batch_idx, (u, _) in enumerate(dataset_loader):
-        print(f"Processing batch {batch_idx + 1}/{len(dataset_loader)}")
+    for batch_idx, (u, _) in enumerate(chunk_dataset_loader):
+        print(f"Processing batch {batch_idx + 1}/{len(chunk_dataset_loader)}")
         batch_size = u.shape[0]
         y_phy_batch = torch.zeros((batch_size, N_HOURS_Y, 1), device=u.device)
 
         vx, vy = get_scaled_vx_vy(u, vx_min, vx_max, vy_min, vy_max)
 
         for b in range(batch_size):
-            print(f"Processing batch {batch_idx + 1}/{len(dataset_loader)}, sample {b + 1}/{batch_size}")
+            print(f"Processing batch {batch_idx + 1}/{len(chunk_dataset_loader)}, sample {b + 1}/{batch_size}")
             
             # Extract the intitial pollution levels at Tuindorp and Breukelen at 1 hour before prediction
             C_tuindorp = u[b, -N_HOURS_Y - 1, NO2_TUINDORP_IDX].numpy()
@@ -200,21 +200,95 @@ def precompute_y_phy_for_all_batches_eq1(
 
     writer.close()
 
+def precompute_y_phy_for_all_batches_eq2(
+    all_dataset_loader, chunk_dataset_loader,
+    output_file="output.pkl", log_dir="runs/y_phy_tracking"
+):
 
-def load_all_y_phy(loss_function):
-    """
-    Load all y_phy values for the entire dataset.
-    - loss_function: "MSE" or "Physics_Linear_MSE" or "PDE_nmer_const" or "Physics_PDE_numerical_piecewise"
-
-    Returns: List of all y_phy values for the entire dataset.
-    """
+    print("Computing y phy with equation 2...")
+    writer = SummaryWriter(log_dir=log_dir)
     all_y_phy = []
+    with open("physics_outputs/testing_empty.pkl", "wb") as f:
+        pickle.dump(all_y_phy, f)
+    # Step 1: Compute global min/max values
+    vx_min, vx_max, vy_min, vy_max = compute_global_min_max_vx_vy(all_dataset_loader)
+    # Convert to (x, y) in km
+    x_breukelen, y_breukelen = latlon_to_xy(LAT_TUINDORP, LON_TUINDORP, LAT_BREUKELEN, LON_BREUKELEN)
+    x_tuindorp, y_tuindorp = 0, 0  # Set Tuindorp as the origin
 
-    if loss_function == "PDE_nmer_const":
-        with open("physics_outputs/y_phy_batchsize16_eq1_2017.pkl", "rb") as f:
-            all_y_phy = pickle.load(f)
-    elif loss_function == "Physics_PDE_numerical_piecewise":
-        # Load y_phy values from file
-        all_y_phy = torch.load("data/y_phy_pde_numerical_piecewise.pt")
+    advection_pde = PDE({"c": "- vx * d_dx(c) - vy * d_dy(c)"}, consts={"vx": 0, "vy": 0})
+    # Define spatial grid for a region of 15x15 km (adjust based on domain)
+    grid = CartesianGrid([[-10, 5], [0, 15]], [20, 20])  # 20x20 grid covering -10 to 5 km along x and 0 to 15 km along y
 
-    return all_y_phy
+    
+    for batch_idx, (u, _) in enumerate(chunk_dataset_loader):
+        print(f"Processing batch {batch_idx + 1}/{len(chunk_dataset_loader)}")
+        batch_size = u.shape[0]
+        y_phy_batch = torch.zeros((batch_size, N_HOURS_Y, 1), device=u.device)
+
+        vx, vy = get_scaled_vx_vy(u, vx_min, vx_max, vy_min, vy_max)
+
+        for b in range(batch_size):
+            print(f"Processing batch {batch_idx + 1}/{len(chunk_dataset_loader)}, sample {b + 1}/{batch_size}")
+            
+            # Extract the intitial pollution levels at Tuindorp and Breukelen at 1 hour before prediction
+            C_tuindorp = u[b, -N_HOURS_Y - 1, NO2_TUINDORP_IDX].numpy()
+            C_breukelen = u[b, -N_HOURS_Y - 1, NO2_BREUKELEN_IDX].numpy()
+
+            # create pollution field with grid and initial pollution values
+            pollution_values_2d = create_pollution_field(grid, C_tuindorp, C_breukelen, x_tuindorp, y_tuindorp, x_breukelen, y_breukelen)
+            c_m = ScalarField(grid, pollution_values_2d)
+
+            for t in range(N_HOURS_Y):
+                # Set vx, vy from KNMI predictions at time t (relative to start of prediction horizon)
+                advection_pde.consts["vx"] = float(vx[b, t].numpy())
+                advection_pde.consts["vy"] = float(vy[b, t].numpy())
+
+                # solve the pde and update c_m for the next timestep
+                result_data = advection_pde.solve(c_m, t_range=t, dt = 0.001, tracker=None).data
+                c_m.data = result_data
+
+                # Compute calculated pollution concentration from the grid at Breukelens coordinates
+                y_phy_batch[b, t, 0] = compute_pollution_at_breukelen(result_data, grid, x_breukelen, y_breukelen)
+
+                # Log some values to TensorBoard
+                if b % 5 == 0 and t % 2 == 0:  # Reduce logging overhead
+                    writer.add_scalar("y_phy/value", y_phy_batch[b, t, 0].item(), global_step=(batch_idx * batch_size + b) * N_HOURS_Y + t)
+            del result_data
+            del c_m
+            del pollution_values_2d
+        all_y_phy.append(y_phy_batch)
+        del y_phy_batch
+
+    
+        # Save as .pkl file
+    with open(output_file, "wb") as f:
+        pickle.dump(all_y_phy, f)
+    print(f"y_phy for all batches saved to {output_file}")
+
+    writer.close()
+
+
+def load_all_y_phy(phy_output_path, y_phy_filename):
+    # File paths for each chunk
+    file_1 = f"{phy_output_path}/{y_phy_filename}_1.pkl"
+    file_2 = f"{phy_output_path}/{y_phy_filename}_2.pkl"
+    file_3 = f"{phy_output_path}/{y_phy_filename}_3.pkl"
+    file_4 = f"{phy_output_path}/{y_phy_filename}_4.pkl"
+
+    # Load all four files
+    with open(file_1, "rb") as f:
+        y_phy_1 = pickle.load(f)
+    with open(file_2, "rb") as f:
+        y_phy_2 = pickle.load(f)
+
+    with open(file_3, "rb") as f:
+        y_phy_3 = pickle.load(f)
+    with open(file_4, "rb") as f:
+        y_phy_4 = pickle.load(f)
+    # Concatenate the arrays
+    all_y_phy = np.concatenate([y_phy_1, y_phy_2, y_phy_3, y_phy_4], axis=0)
+
+    # Verify the shape of the concatenated array (optional)
+    print("comcatemated four chunks of y phy")
+    print(f"Shape of concatenated y_phy: {all_y_phy.shape}")
