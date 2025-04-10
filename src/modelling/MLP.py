@@ -32,7 +32,7 @@ class BasicMLP(nn.Module):
 
         return outputs[:, -24:, :]  # Predict last 24 hours
 
-    def train_model(self, train_loader, val_loader, all_y_phy = None, epochs=50, lr=1e-3, weight_decay=1e-6, lambda_phy = 1e-5, device="cpu"):
+    def train_model(self, train_loader, val_loader, all_y_phy = None, epochs=50, lr=1e-3, weight_decay=1e-6, lambda_phy = 1e-5, device="cpu", trial=None):
         self.to(device)
         optimizer = optim.Adam(self.parameters(), lr=lr, weight_decay=weight_decay)
 
@@ -81,6 +81,11 @@ class BasicMLP(nn.Module):
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 best_model_state = self.state_dict()
+
+            if trial is not None:  # If using Optuna for hyperparameter tuning
+                trial.report(val_loss, step=epoch)  # Report the validation loss to Optuna
+                if trial.should_prune():
+                    raise optuna.TrialPruned()
 
             print(f"Epoch {epoch+1}/{epochs} - Train Loss: {train_loss:.6f} - Val Loss (simple RMSE, no physics involved): {val_loss:.6f}")
 
