@@ -266,9 +266,9 @@ print(f"Third 10 batches count: {len(third_10_batches)}")
 print(f"Fourth batch count: {len(fourth_10_batches)} (should be 11 if dataset has 41 batches)")
 
 
-phy_path = f"{PHY_OUTPUT_PATH}/{Y_PHY_FILENAME}_1.pkl"
+phy_path = f"{PHY_OUTPUT_PATH}/{Y_PHY_FILENAME}_test1.pkl"
 print("first 10 batches phy_path: ", phy_path)
-precompute_y_phy_for_all_batches_eq1(all_dataset_loader= temp_train_loader, chunk_dataset_loader=first_10_batches, output_file = phy_path)
+precompute_y_phy_for_all_batches_eq2(all_dataset_loader= temp_train_loader, chunk_dataset_loader=first_10_batches, output_file = phy_path)
 
 
 
