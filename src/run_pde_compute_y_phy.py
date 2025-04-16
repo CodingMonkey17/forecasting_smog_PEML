@@ -92,7 +92,7 @@ TRAIN_YEARS = [2017, 2018, 2020, 2021, 2022]
 VAL_YEARS = [2021, 2022, 2023]
 TEST_YEARS = [2021, 2022, 2023]
 
-LOSS_FUNC = "PDE_nmer_piece" # PDE numerical solver with equation 1, of constant wind speed and direction
+LOSS_FUNC = "PDE_nmer_const" # PDE numerical solver with equation 1, of constant wind speed and direction
 NN_TYPE = "MLP" # choose from "MLP", "RNN", "LSTM", "GRU"
 torch.random.manual_seed(34)
 
@@ -268,7 +268,7 @@ print(f"Fourth batch count: {len(fourth_10_batches)} (should be 11 if dataset ha
 
 phy_path = f"{PHY_OUTPUT_PATH}/{Y_PHY_FILENAME}_1.pkl"
 print("first 10 batches phy_path: ", phy_path)
-precompute_y_phy_for_all_batches_eq2(all_dataset_loader= temp_train_loader, chunk_dataset_loader=first_10_batches, output_file = phy_path)
+precompute_y_phy_for_all_batches_eq1(all_dataset_loader= temp_train_loader, chunk_dataset_loader=first_10_batches, output_file = phy_path)
 
 
 

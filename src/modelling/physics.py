@@ -9,6 +9,56 @@ import math
 import numpy as np
 import pickle
 
+
+def latlon_to_xy(lat1, lon1, lat2, lon2):
+    """Convert lat/lon to approximate x, y in km using the equirectangular projection."""
+    R = 6371  # Radius of Earth in km
+    x = (lon2 - lon1) * (math.pi / 180) * R * math.cos(math.radians((lat1 + lat2) / 2))
+    y = (lat2 - lat1) * (math.pi / 180) * R
+    return x, y
+
+def compute_linear_y_phy(u, time_step=1):
+    """
+    Computes y_phy using the same indexing technique as y.
+    
+    - u: Input tensor containing weather and pollution data (shape: batch_size, time_steps, features)
+    - time_step: Time step interval (default 1 hour)
+    
+    Returns: y_phy of shape (batch_size, input_length, 1)
+    """
+    batch_size, total_time_steps, num_features = u.shape  # Get dimensions
+
+    # Extract relevant features
+    wind_speed = u[:, :, WIND_SPEED_IDX]  # Wind speed (FH), assumed in m/s
+    pollution = u[:, :, NO2_TUINDORP_IDX]  # NO2 pollution (pollution at Breukelen)
+
+    # Convert wind speed from m/s to km/h
+    wind_speed_kmh = wind_speed * 3.6  
+    
+     # Convert to (x, y) in km
+    x_breukelen, y_breukelen = latlon_to_xy(LAT_TUINDORP, LON_TUINDORP, LAT_BREUKELEN, LON_BREUKELEN)
+    x_tuindorp, y_tuindorp = 0, 0  # Set Tuindorp as the origin
+    # Compute distance between Tuindorp and Breukelen
+    distance = math.sqrt(x_breukelen**2 + y_breukelen**2)
+
+    # Compute travel time in hours: t = d / u
+    travel_time = distance / (wind_speed_kmh + 1e-6)  # Avoid division by zero
+    # Convert travel time to index shifts (time steps), rounding UP to nearest hour
+    time_shifts = torch.ceil(travel_time / time_step).long()  # (batch_size, N_HOURS_U)
+    # Ensure valid indexing (clamp time shift to stay within history range)
+    time_shifts = torch.clamp(time_shifts, min=0, max=N_HOURS_U - N_HOURS_Y)
+
+    # Compute y_phy by shifting pollution data accordingly
+    y_phy = torch.zeros((batch_size, N_HOURS_Y, 1), device=u.device)  # Initialize tensor
+
+    for b in range(batch_size):
+        for t in range(N_HOURS_Y):
+            shift_t = time_shifts[b, -N_HOURS_Y + t]  # Get time shift for each time step
+            src_idx = max(0, N_HOURS_U - N_HOURS_Y - shift_t + t)  # Ensure valid index
+            y_phy[b, t, 0] = pollution[b, src_idx]
+
+    return y_phy
+
 # Function to compute pollution concentration at Breukelen
 def compute_pollution_at_breukelen(result_data, grid, x_breukelen, y_breukelen):
     """
@@ -112,12 +162,7 @@ def get_scaled_vx_vy(u, vx_min, vx_max, vy_min, vy_max):
     vy = (vy - vy_min) / (vy_max - vy_min + 1e-8)
     return vx, vy
 
-def latlon_to_xy(lat1, lon1, lat2, lon2):
-    """Convert lat/lon to approximate x, y in km using the equirectangular projection."""
-    R = 6371  # Radius of Earth in km
-    x = (lon2 - lon1) * (math.pi / 180) * R * math.cos(math.radians((lat1 + lat2) / 2))
-    y = (lat2 - lat1) * (math.pi / 180) * R
-    return x, y
+
 
 
 
@@ -137,7 +182,7 @@ def precompute_y_phy_for_all_batches_eq1(
     - output_file: The file to save the computed y_phy tensor.
     - log_dir: Directory for TensorBoard logs.
     """
-    
+    print("Computing y phy with equation 1...")
     writer = SummaryWriter(log_dir=log_dir)
     all_y_phy = []
     with open("physics_outputs/testing_empty.pkl", "wb") as f:
@@ -150,7 +195,7 @@ def precompute_y_phy_for_all_batches_eq1(
 
     advection_pde = PDE({"c": "- vx * d_dx(c) - vy * d_dy(c)"}, consts={"vx": 0, "vy": 0})
     # Define spatial grid for a region of 15x15 km (adjust based on domain)
-    grid = CartesianGrid([[-10, 5], [0, 15]], [20, 20])  # 20x20 grid covering -10 to 5 km along x and 0 to 15 km along y
+    grid = CartesianGrid([[-15, 5], [-5, 15]], [20, 20])  # 20x20 grid 
 
     
     for batch_idx, (u, _) in enumerate(chunk_dataset_loader):
@@ -218,7 +263,7 @@ def precompute_y_phy_for_all_batches_eq2(
 
     advection_pde = PDE({"c": "- vx * d_dx(c) - vy * d_dy(c)"}, consts={"vx": 0, "vy": 0})
     # Define spatial grid for a region of 15x15 km (adjust based on domain)
-    grid = CartesianGrid([[-10, 5], [0, 15]], [20, 20])  # 20x20 grid covering -10 to 5 km along x and 0 to 15 km along y
+    grid = CartesianGrid([[-15, 5], [-5, 15]], [20, 20])  # 20x20 grid 
 
     
     for batch_idx, (u, _) in enumerate(chunk_dataset_loader):
@@ -234,15 +279,16 @@ def precompute_y_phy_for_all_batches_eq2(
             # Extract the intitial pollution levels at Tuindorp and Breukelen at 1 hour before prediction
             C_tuindorp = u[b, -N_HOURS_Y - 1, NO2_TUINDORP_IDX].numpy()
             C_breukelen = u[b, -N_HOURS_Y - 1, NO2_BREUKELEN_IDX].numpy()
-
+            vx_output = vx[:, -N_HOURS_Y:]
+            vy_output = vy[:, -N_HOURS_Y:]
             # create pollution field with grid and initial pollution values
             pollution_values_2d = create_pollution_field(grid, C_tuindorp, C_breukelen, x_tuindorp, y_tuindorp, x_breukelen, y_breukelen)
             c_m = ScalarField(grid, pollution_values_2d)
 
             for t in range(N_HOURS_Y):
                 # Set vx, vy from KNMI predictions at time t (relative to start of prediction horizon)
-                advection_pde.consts["vx"] = float(vx[b, t].numpy())
-                advection_pde.consts["vy"] = float(vy[b, t].numpy())
+                advection_pde.consts["vx"] = float(vx_output[b, t].numpy())
+                advection_pde.consts["vy"] = float(vy_output[b, t].numpy())
 
                 # solve the pde and update c_m for the next timestep
                 result_data = advection_pde.solve(c_m, t_range=t, dt = 0.001, tracker=None).data
@@ -292,3 +338,55 @@ def load_all_y_phy(phy_output_path, y_phy_filename):
     # Verify the shape of the concatenated array (optional)
     print("comcatemated four chunks of y phy")
     print(f"Shape of concatenated y_phy: {all_y_phy.shape}")
+    return all_y_phy
+
+
+def compute_pinn_phy_loss(y_pred, u, all_dataset_loader):
+
+    # --- 1. Extract necessary data from input tensor 'u' ---
+    output_idx_start = N_HOURS_U - N_HOURS_Y + 1
+    x_breukelen, y_breukelen = latlon_to_xy(LAT_TUINDORP, LON_TUINDORP, LAT_BREUKELEN, LON_BREUKELEN)
+    delta_x = abs(x_breukelen - 0)  # Tuindorp is at (0, 0)
+    delta_y = abs(y_breukelen - 0)  # Tuindorp is at (0, 0)
+    vx_min, vx_max, vy_min, vy_max = compute_global_min_max_vx_vy(all_dataset_loader)
+    vx, vy = get_scaled_vx_vy(u, vx_min, vx_max, vy_min, vy_max)
+    vx_output = vx[:, -N_HOURS_Y:]
+    vy_output = vy[:, -N_HOURS_Y:]
+    
+    c_tuindorp_t = u[:, -N_HOURS_Y:, NO2_TUINDORP_IDX]
+    c_breukelen_hist_t48 = u[:, output_idx_start -1, NO2_BREUKELEN_IDX].unsqueeze(1) # u[:, 48, :].unsqueeze(1) -> (batch, 1)
+
+    if y_pred.dim() == 3 and y_pred.shape[-1] == 1:
+        y_pred_squeezed = y_pred.squeeze(-1)
+    else:
+        # If y_pred is already (batch, 24), use it directly
+        # Add a check or warning if shape is unexpected
+        if y_pred.dim() != 2 or y_pred.shape[1] != N_HOURS_Y:
+             print(f"Warning: Unexpected y_pred shape {y_pred.shape} in compute_pinn_phy_loss. Expected (batch, {N_HOURS_Y}) or (batch, {N_HOURS_Y}, 1).")
+        y_pred_squeezed = y_pred
+    # equation : dc/dt + vx * dc/dx + vy * dc/dy = 0
+
+
+    # --- 2. Calculate PDE Terms (Units: km, h) ---
+    # ∂c/∂t ≈ (c(t) - c(t-1)) / Δt_hours (where Δt = 1 hour)
+    # Sequence needed: [c(48)_hist, c(49)_pred, ..., c(72)_pred]
+    c_breukelen_full = torch.cat([c_breukelen_hist_t48, y_pred_squeezed], dim=1) # Shape: (batch, 1+24=25)
+    delta_c_t = torch.diff(c_breukelen_full, dim=1) # Shape: (batch, 24) - Represents c(t) - c(t-1) for t=49 to 72
+    dcdt = delta_c_t / 1.0 # Units: [C]/h
+
+    
+
+    delta_c_spatial = y_pred_squeezed - c_tuindorp_t # Shape: (batch, 24)
+    dcdx = delta_c_spatial / delta_x # Shape: (batch, 24)
+    dcdy = delta_c_spatial / delta_y # Shape: (batch, 24)
+
+    # --- 3. Calculate PDE Residual ---
+    # Residual = ∂c/∂t + v_x * ∂c/∂x + v_y * ∂c/∂y for t=49 to 72
+    residual = dcdt + vx_output * dcdx + vy_output * dcdy # Shape: (batch, 24)
+
+    # --- 4. Calculate Physics Loss ---
+    # Mean Squared Error of the residual over the 24 predicted hours
+    phy_loss = torch.mean(residual**2)
+
+    return phy_loss
+    

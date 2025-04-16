@@ -54,7 +54,7 @@ class BasicMLP(nn.Module):
                 optimizer.zero_grad()
 
                 output = self.forward(u)
-                loss= compute_loss(output, y, u, self.loss_function, lambda_phy = lambda_phy, all_y_phy = all_y_phy, batch_idx = batch_idx)  # Compute loss based on selected function
+                loss= compute_loss(output, y, u, self.loss_function, lambda_phy = lambda_phy, all_y_phy = all_y_phy, batch_idx = batch_idx, train_loader= train_loader)  # Compute loss based on selected function
 
                 loss.backward()
                 optimizer.step()
