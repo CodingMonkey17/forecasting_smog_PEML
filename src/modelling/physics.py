@@ -4,7 +4,6 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 from pde import CartesianGrid, ScalarField, VectorField, PDE
 import torch
-from torch.utils.tensorboard import SummaryWriter
 import math
 import numpy as np
 import pickle
