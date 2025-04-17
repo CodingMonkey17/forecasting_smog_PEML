@@ -75,6 +75,12 @@ def compute_loss(y_pred, y_true, u, loss_function, lambda_phy, all_y_phy, batch_
 
     Returns: Total loss (MSE or MSE + Physics loss)
     """
+    # Detect device from y_pred (assumes y_pred and y_true are on same device)
+    device = y_pred.device
+
+    # Ensure y_true and u are also on the same device
+    y_true = y_true.to(device)
+    u = u.to(device)
     basic_mse_loss = mse_loss(y_pred, y_true)
 
 
@@ -83,7 +89,7 @@ def compute_loss(y_pred, y_true, u, loss_function, lambda_phy, all_y_phy, batch_
         return basic_mse_loss
 
     elif loss_function == "LinearShift_MSE":
-        y_phy = compute_linear_y_phy(u, time_step = 1)
+        y_phy = compute_linear_y_phy(u, time_step = 1).to(device)
         phy_loss = mse_loss(y_pred, y_phy) # L_phy (y_pred, y_phy) = MSE(y_pred, y_phy)
         total_weighted_loss = compute_weighted_total_loss(basic_mse_loss, phy_loss, lambda_phy, u) # L = L_mse + lambda_phy * L_phy
         return total_weighted_loss
@@ -93,7 +99,7 @@ def compute_loss(y_pred, y_true, u, loss_function, lambda_phy, all_y_phy, batch_
         if all_y_phy is None:
             print("Error: all_y_phy is None. Please load the y_phy values first.")
             return None
-        y_phy = get_y_phy_batch(all_y_phy, batch_idx)
+        y_phy = get_y_phy_batch(all_y_phy, batch_idx).to(device)
 
         # Compute the loss
         phy_loss = mse_loss(y_pred, y_phy)
@@ -105,7 +111,7 @@ def compute_loss(y_pred, y_true, u, loss_function, lambda_phy, all_y_phy, batch_
         if train_loader is None:
             print("Error: train_loader is None. Please provide the train_loader.")
             return None
-        phy_loss = compute_pinn_phy_loss(y_pred, u, train_loader)
+        phy_loss = compute_pinn_phy_loss(y_pred, u, train_loader).to(device)
         # Combine the losses
         total_weighted_loss = compute_weighted_total_loss(basic_mse_loss, phy_loss, lambda_phy, u)
         return total_weighted_loss

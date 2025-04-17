@@ -122,8 +122,10 @@ class BasicMLP(nn.Module):
 
                 # Denormalize for RMSE and MSE calculation
                 if min_value is not None and max_value is not None:
-                    output = output * (max_value - min_value) + min_value
-                    y = y * (max_value - min_value) + min_value
+                    min_value_tensor = torch.tensor(min_value, device=device, dtype=output.dtype)
+                    max_value_tensor = torch.tensor(max_value, device=device, dtype=output.dtype)
+                    output = output * (max_value_tensor - min_value_tensor) + min_value_tensor
+                    y = y * (max_value_tensor - min_value_tensor) + min_value_tensor
                 output = output.to(torch.float64)
                 y = y.to(torch.float64)
 
