@@ -1,8 +1,8 @@
 {
-    "n_hidden_layers": 1,
-    "n_hidden_units": 172,
-    "lr": 0.0007975189256538179,
-    "weight_decay": 1.264634345998174e-08,
-    "lambda_phy": 7.157830743299169e-05,
+    "n_hidden_layers": 5,
+    "n_hidden_units": 110,
+    "lr": 0.00196431108985435,
+    "weight_decay": 1.2857958559390203e-07,
+    "lambda_phy": 0.0026498140983581076,
     "batch_size": 16
 }
