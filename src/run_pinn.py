@@ -264,8 +264,13 @@ train_dataset.u[0].iloc[:,WIND_SPEED_IDX]
 
 
 # # Run Optuna optimization
-# study = optuna.create_study(direction="minimize", study_name="mlp_hyperparameter_optimization_PDE_nmer_const_all_years_updated", storage="sqlite:///mlp_hyperparameter_optimization_phy_pde.db", load_if_exists=True)
-
+# study = optuna.create_study(
+#     direction="minimize", 
+#     study_name="mlp_hyperparameter_optimization_PINN", 
+#     storage="sqlite:///mlp_hyperparameter_optimization_phy_pde.db", 
+#     load_if_exists=True,
+#     pruner=optuna.pruners.HyperbandPruner(),
+#     )
 # study.optimize(objective, n_trials=50)
 
 # # Print best hyperparameters
