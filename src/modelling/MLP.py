@@ -36,8 +36,24 @@ class BasicMLP(nn.Module):
         self.to(device)
         optimizer = optim.Adam(self.parameters(), lr=lr, weight_decay=weight_decay)
 
+
+        # Add scheduler according to Table D.2
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer, 
+            mode='min',
+            factor=0.1,  # Reduce LR by a factor of 0.1
+            patience=5,  # Wait for 5 epochs of no improvement
+            verbose=True
+        )
+        
+        # Add early stopping with patience=6 as per Table D.2
+        early_stop_patience = 6
+        no_improve_count = 0
+
         best_val_loss = float("inf")
         best_model_state = None
+        train_losses = []
+        val_losses = []
         # Start timing training
 
         start_train_time = time.time()
@@ -61,6 +77,7 @@ class BasicMLP(nn.Module):
                 train_loss += loss.item()
 
             train_loss /= len(train_loader)
+            train_losses.append(train_loss)
 
 
             # Validation step
@@ -73,27 +90,41 @@ class BasicMLP(nn.Module):
                     mse_loss_fn = nn.MSELoss()
                     mse_loss = mse_loss_fn(output, y)
                     #val loss is rmse
-                    val_loss += torch.sqrt(mse_loss).item()
+                    val_loss += mse_loss.item()
 
             val_loss /= len(val_loader)
+            val_losses.append(val_loss)
 
-            # Save best model
+            # Update scheduler based on validation loss
+            scheduler.step(val_loss)
+            
+            # Save best model and check for early stopping
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 best_model_state = self.state_dict()
-
-            if trial is not None:  # If using Optuna for hyperparameter tuning
-                trial.report(val_loss, step=epoch)  # Report the validation loss to Optuna
+                no_improve_count = 0  # Reset counter
+            else:
+                no_improve_count += 1  # Increment counter
+                
+            # Apply early stopping if needed
+            if no_improve_count >= early_stop_patience:
+                print(f"Early stopping triggered after {epoch+1} epochs")
+                break
+                
+            # Optuna handling
+            if trial is not None:
+                trial.report(val_loss, step=epoch)
                 if trial.should_prune():
                     raise optuna.TrialPruned()
 
-            print(f"Epoch {epoch+1}/{epochs} - Train Loss: {train_loss:.6f} - Val Loss (simple RMSE, no physics involved): {val_loss:.6f}")
+            # current_lr = optimizer.param_groups[0]['lr']
+            print(f"Epoch {epoch+1}/{epochs} - Train Loss: {train_loss:.6f} - Val Loss: {val_loss:.6f}")
 
 
         total_train_time = time.time() - start_train_time  # Total training time
         if best_model_state:
             self.load_state_dict(best_model_state)
-        return best_val_loss, total_train_time
+        return best_val_loss, total_train_time, train_losses, val_losses
 
 
     def test_model(self, test_loader, min_value=None, max_value=None, device="cpu"):
