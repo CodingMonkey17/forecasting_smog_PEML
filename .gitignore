@@ -14,3 +14,4 @@ __pycache__/
 GRU.ipynb
 venv
 .env
+.db

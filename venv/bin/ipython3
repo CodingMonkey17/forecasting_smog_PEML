@@ -1,4 +1,4 @@
-#!/home/rachel/forecasting_smog_PEML/venv/bin/python
+#!/home/rachel/forecasting_smog_PEML/venv/bin/python3.10
 # -*- coding: utf-8 -*-
 import re
 import sys
