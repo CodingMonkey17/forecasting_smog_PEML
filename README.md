@@ -44,7 +44,7 @@ forecasting_smog_PEML/
 
 ## Data
 
-The dataset includes **hourly time series data from 2017–2023**, excluding 2016 and 2019 (details in preprocessing documentation).
+The dataset includes **hourly time series data from 2016–2023**, excluding 2016 and 2019 (details in preprocessing documentation).
 
 ### Weather Data
 
