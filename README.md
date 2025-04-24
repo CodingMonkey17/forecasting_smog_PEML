@@ -16,7 +16,7 @@ The core components include:
 - Rigorous evaluation framework
 
 ## Project Structure
-
+```
 forecasting_smog_PEML/
 ├── data/                  # Data directory (not included in repo)
 │   ├── data_raw/          # Raw downloaded data files
@@ -40,6 +40,7 @@ forecasting_smog_PEML/
 │   ├── config.py          # All global variables
 │   ├── preprocess.ipynb   # Preprocess datasets
 │   └── run_pde_compute_y_phy.py    # Computation of Physics Outputs
+```
 
 ## Data
 
