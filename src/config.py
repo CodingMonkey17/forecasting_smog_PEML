@@ -7,8 +7,12 @@ RESULTS_PATH = BASE_DIR / "src" / "results"
 
 MINMAX_PATH_2017 = BASE_DIR  / "data" / "data_combined" / "only_2017"/ "pollutants_minmax_2017.csv"
 MINMAX_PATH_ALLYEARS = BASE_DIR  / "data" / "data_combined" / "all_years"/ "pollutants_minmax_allyears.csv"
+MINMAX_PATH_FIRST3YEARS = BASE_DIR  / "data" / "data_combined" / "first_3_years"/ "pollutants_minmax_2017_2018_2020.csv"
 DATASET_PATH_2017 = BASE_DIR / "data" / "data_combined" / "only_2017"
 DATASET_PATH_ALLYEARS = BASE_DIR / "data" / "data_combined" / "all_years"
+DATASET_PATH_FIRST3YEARS = BASE_DIR / "data" / "data_combined" / "first_3_years"
+
+
 PHY_OUTPUT_PATH = BASE_DIR / "src" / "physics_outputs"
 
 N_HOURS_U = 24 * 3               # number of hours to use for input (number of days * 24 hours)

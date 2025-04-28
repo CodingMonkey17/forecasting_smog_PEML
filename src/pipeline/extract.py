@@ -40,7 +40,8 @@ def read_contaminant_csv_from_data_raw(
 
 
 def read_meteo_csv_from_data_raw(
-        year: str
+        year: str,
+        city: str
     ) -> pd.DataFrame:
     """
     Reads the meteorological data from the raw data folder
@@ -52,7 +53,7 @@ def read_meteo_csv_from_data_raw(
     """
     os.chdir(Path.cwd())
 
-    return pd.read_csv(f"../data/data_raw/{year}_meteo_Utrecht.csv",
+    return pd.read_csv(f"../data/data_raw/{year}_meteo_{city}.csv",
                        sep = ';',
                        encoding = 'UTF-8',
                        index_col = 0) 

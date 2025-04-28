@@ -101,5 +101,5 @@ def print_split_ratios(
         return
 
     print(f"[train/validation/test] %-ratio for {comp} data is: ", end = '')
-    print(f"[{round(len(df_train) / total_len * 100, 1)}/", end = '')
-    print(f"{round(len(df_val) / total_len * 100, 1)}/{round(len(df_test) / total_len * 100, 1)}]")
+    print(f"[{round(len(df_train) / total_len * 100, 3)}/", end = '')
+    print(f"{round(len(df_val) / total_len * 100, 3)}/{round(len(df_test) / total_len * 100, 3)}]")
