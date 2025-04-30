@@ -30,13 +30,31 @@ N_HOURS_STEP = 24                 # "sampling rate" in hours of the data; e.g. 2
                                   # means sample an I/O-pair every 24 hours
                                   # the contaminants and meteorological vars
 
-NO2_TUINDORP_IDX =  5
-NO2_BREUKELEN_IDX =  4
-WIND_DIR_IDX =  0
-WIND_SPEED_IDX =  2
+# for Tuindorp and Breukelens task
+# dictionary for station idx
+UTRECHT_IDX = {
+    'NO2_TUINDORP_IDX': 5,
+    'NO2_BREUKELEN_IDX': 4,
+    'WIND_DIR_IDX': 0,
+    'WIND_SPEED_IDX': 2
+}
 
-NO2_OUDEMEER_IDX =  5
-NO2_HAARLEM_IDX =  4
+
+# for Amsterdam transferability task
+# dictionary for station idx
+AMSTERDAM_IDX = {
+    'NO2_OUDEMEER_IDX' : 5,
+    'NO2_HAARLEM_IDX' :  4,
+    'WIND_DIR_IDX': 0,
+    'WIND_SPEED_IDX': 2
+}
+
+MULTI_STATION_IDX = {
+
+}
+
+
+
 
 LAT_TUINDORP, LON_TUINDORP = 52.10503, 5.12448 # Coordinates of Tuindorp based on valentijn thesis (52°06’18.1”N, 5°07’28.1”E) and converted
 LAT_BREUKELEN, LON_BREUKELEN = 52.20153, 4.98741 # Positioned at a 30° angle from Tuindorp 

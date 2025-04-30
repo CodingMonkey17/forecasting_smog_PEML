@@ -16,7 +16,9 @@ def latlon_to_xy(lat1, lon1, lat2, lon2):
     y = (lat2 - lat1) * (math.pi / 180) * R
     return x, y
 
-def compute_linear_y_phy(u, time_step=1):
+
+
+def compute_linear_y_phy_utrecht(u, time_step=1, idx_dict=None):
     """
     Computes y_phy using the same indexing technique as y.
     
@@ -28,8 +30,8 @@ def compute_linear_y_phy(u, time_step=1):
     batch_size, total_time_steps, num_features = u.shape  # Get dimensions
 
     # Extract relevant features
-    wind_speed = u[:, :, WIND_SPEED_IDX]  # Wind speed (FH), assumed in m/s
-    pollution = u[:, :, NO2_TUINDORP_IDX]  # NO2 pollution (pollution at Breukelen)
+    wind_speed = u[:, :, idx_dict[f"WIND_SPEED_IDX"]]  # Wind speed (FH), assumed in m/s
+    pollution = u[:, :, idx_dict[f"NO2_TUINDORP_IDX"]]  # NO2 pollution (pollution at Breukelen)
 
     # Convert wind speed from m/s to km/h
     wind_speed_kmh = wind_speed * 3.6  
@@ -57,6 +59,9 @@ def compute_linear_y_phy(u, time_step=1):
             y_phy[b, t, 0] = pollution[b, src_idx]
 
     return y_phy
+
+def compute_linear_y_phy_multi():
+    pass
 
 # Function to compute pollution concentration at Breukelen
 def compute_pollution_at_breukelen(result_data, grid, x_breukelen, y_breukelen):
@@ -129,14 +134,14 @@ def create_pollution_field(grid, C_tuindorp, C_breukelen, x_tuindorp, y_tuindorp
             pollution_values_2d[i, j] = get_linear_interpolate(x, y, C_tuindorp, C_breukelen, x_tuindorp, y_tuindorp, x_breukelen, y_breukelen)
     return pollution_values_2d
 
-def compute_global_min_max_vx_vy(dataset_loader):
+def compute_global_min_max_vx_vy(dataset_loader, idx_dict):
     """ Compute global min and max for vx and vy across the entire dataset. """
     vx_min, vx_max = float('inf'), float('-inf')
     vy_min, vy_max = float('inf'), float('-inf')
 
     for u, _ in dataset_loader:
-        wind_speed = u[:, :, WIND_SPEED_IDX] * 3.6  # Convert m/s to km/h
-        wind_direction = u[:, :, WIND_DIR_IDX] * 360  # Convert to degrees
+        wind_speed = u[:, :, idx_dict[f"WIND_SPEED_IDX"]] * 3.6  # Convert m/s to km/h
+        wind_direction = u[:, :, idx_dict[f"WIND_DIR_IDX"]] * 360  # Convert to degrees
 
         vx = wind_speed * torch.cos(torch.deg2rad(wind_direction))
         vy = wind_speed * torch.sin(torch.deg2rad(wind_direction))
@@ -148,10 +153,10 @@ def compute_global_min_max_vx_vy(dataset_loader):
 
     return vx_min, vx_max, vy_min, vy_max
 
-def get_scaled_vx_vy(u, vx_min, vx_max, vy_min, vy_max):
+def get_scaled_vx_vy(u, vx_min, vx_max, vy_min, vy_max, idx_dict):
     # Compute wind velocity components
-    wind_speed = u[:, :, WIND_SPEED_IDX] * 3.6
-    wind_direction = u[:, :, WIND_DIR_IDX] * 360
+    wind_speed = u[:, :, idx_dict[f"WIND_SPEED_IDX"]] * 3.6
+    wind_direction = u[:, :, idx_dict[f"WIND_DIR_IDX"]] * 360
 
     vx = wind_speed * torch.cos(torch.deg2rad(wind_direction))
     vy = wind_speed * torch.sin(torch.deg2rad(wind_direction))
@@ -165,152 +170,89 @@ def get_scaled_vx_vy(u, vx_min, vx_max, vy_min, vy_max):
 
 
 
-def precompute_y_phy_for_all_batches_eq1(
-    all_dataset_loader, chunk_dataset_loader,
-    output_file="output.pkl", log_dir="runs/y_phy_tracking"
+def precompute_y_phy_for_all_batches_utrecht(
+    all_dataset_loader,
+    chunk_dataset_loader,
+    station_idx_dict,
+    equation_version=1,
+    output_file="output.pkl",
+    log_dir="runs/y_phy_tracking"
 ):
     """
-    Precompute y_phy for all batches, save to a file, and log progress with TensorBoard.
-    
-    Parameters:
-    - dataset_loader: DataLoader for the dataset.
-    - grid: The grid for the simulation.
-    - vx, vy: Wind velocities (assumed to be batch-specific).
-    - N_HOURS_Y: Number of hours to compute pollution for.
-    - x_tuindorp, y_tuindorp, x_breukelen, y_breukelen: Coordinates for Tuindorp and Breukelen.
-    - output_file: The file to save the computed y_phy tensor.
-    - log_dir: Directory for TensorBoard logs.
+    Precompute y_phy using a PDE solver with two equation modes:
+    - Equation 1: Constant wind from t-1 across all prediction steps.
+    - Equation 2: Wind varies at each timestep.
+
+    Args:
+        all_dataset_loader: DataLoader for global wind stats.
+        chunk_dataset_loader: DataLoader with batched input u.
+        station_idx_dict: Dict of indices for NO2 and wind fields.
+        equation_version: 1 or 2, for selecting PDE behavior.
+        output_file: Path to save output.
+        log_dir: TensorBoard log directory.
     """
-    print("Computing y phy with equation 1...")
+    assert equation_version in [1, 2], "Only equation_version 1 or 2 is supported."
+
+    print(f"Computing y_phy with equation {equation_version}...")
     writer = SummaryWriter(log_dir=log_dir)
     all_y_phy = []
-    with open("physics_outputs/testing_empty.pkl", "wb") as f:
-        pickle.dump(all_y_phy, f)
-    # Step 1: Compute global min/max values
-    vx_min, vx_max, vy_min, vy_max = compute_global_min_max_vx_vy(all_dataset_loader)
-    # Convert to (x, y) in km
+
+    vx_min, vx_max, vy_min, vy_max = compute_global_min_max_vx_vy(all_dataset_loader, station_idx_dict)
+
+    # Coordinates for grid setup
     x_breukelen, y_breukelen = latlon_to_xy(LAT_TUINDORP, LON_TUINDORP, LAT_BREUKELEN, LON_BREUKELEN)
-    x_tuindorp, y_tuindorp = 0, 0  # Set Tuindorp as the origin
+    x_tuindorp, y_tuindorp = 0, 0  # Origin at Tuindorp
 
+    grid = CartesianGrid([[-15, 5], [-5, 15]], [20, 20])
     advection_pde = PDE({"c": "- vx * d_dx(c) - vy * d_dy(c)"}, consts={"vx": 0, "vy": 0})
-    # Define spatial grid for a region of 15x15 km (adjust based on domain)
-    grid = CartesianGrid([[-15, 5], [-5, 15]], [20, 20])  # 20x20 grid 
 
-    
     for batch_idx, (u, _) in enumerate(chunk_dataset_loader):
         print(f"Processing batch {batch_idx + 1}/{len(chunk_dataset_loader)}")
         batch_size = u.shape[0]
         y_phy_batch = torch.zeros((batch_size, N_HOURS_Y, 1), device=u.device)
 
-        vx, vy = get_scaled_vx_vy(u, vx_min, vx_max, vy_min, vy_max)
+        vx, vy = get_scaled_vx_vy(u, vx_min, vx_max, vy_min, vy_max, station_idx_dict)
+        vx_output = vx[:, -N_HOURS_Y:]
+        vy_output = vy[:, -N_HOURS_Y:]
 
         for b in range(batch_size):
-            print(f"Processing batch {batch_idx + 1}/{len(chunk_dataset_loader)}, sample {b + 1}/{batch_size}")
-            
-            # Extract the intitial pollution levels at Tuindorp and Breukelen at 1 hour before prediction
-            C_tuindorp = u[b, -N_HOURS_Y - 1, NO2_TUINDORP_IDX].numpy()
-            C_breukelen = u[b, -N_HOURS_Y - 1, NO2_BREUKELEN_IDX].numpy()
+            print(f"  Sample {b + 1}/{batch_size}")
 
-            # create pollution field with grid and initial pollution values
-            pollution_values_2d = create_pollution_field(grid, C_tuindorp, C_breukelen, x_tuindorp, y_tuindorp, x_breukelen, y_breukelen)
+            C_tuindorp = u[b, -N_HOURS_Y - 1, station_idx_dict['NO2_TUINDORP_IDX']].numpy()
+            C_breukelen = u[b, -N_HOURS_Y - 1, station_idx_dict['NO2_BREUKELEN_IDX']].numpy()
+
+            pollution_values_2d = create_pollution_field(grid, C_tuindorp, C_breukelen,
+                                                         x_tuindorp, y_tuindorp, x_breukelen, y_breukelen)
             c_m = ScalarField(grid, pollution_values_2d)
 
             for t in range(N_HOURS_Y):
-                # Assign the wind velocity of 1 hour before the prediction
-                advection_pde.consts["vx"] = float(vx[b, -N_HOURS_Y - 1].numpy())
-                advection_pde.consts["vy"] = float(vy[b, -N_HOURS_Y - 1].numpy())
+                if equation_version == 1:
+                    vx_t = vx[b, -N_HOURS_Y - 1].item()
+                    vy_t = vy[b, -N_HOURS_Y - 1].item()
+                elif equation_version == 2:
+                    vx_t = vx_output[b, t].item()
+                    vy_t = vy_output[b, t].item()
 
-                # solve the pde and update c_m for the next timestep
-                result_data = advection_pde.solve(c_m, t_range=t, dt = 0.001, tracker=None).data
+                advection_pde.consts["vx"] = vx_t
+                advection_pde.consts["vy"] = vy_t
+
+                result_data = advection_pde.solve(c_m, t_range=t, dt=0.001, tracker=None).data
                 c_m.data = result_data
 
-                # Compute calculated pollution concentration from the grid at Breukelens coordinates
                 y_phy_batch[b, t, 0] = compute_pollution_at_breukelen(result_data, grid, x_breukelen, y_breukelen)
 
-                # Log some values to TensorBoard
-                if b % 5 == 0 and t % 2 == 0:  # Reduce logging overhead
-                    writer.add_scalar("y_phy/value", y_phy_batch[b, t, 0].item(), global_step=(batch_idx * batch_size + b) * N_HOURS_Y + t)
-            del result_data
-            del c_m
-            del pollution_values_2d
+                if b % 5 == 0 and t % 2 == 0:
+                    writer.add_scalar("y_phy/value", y_phy_batch[b, t, 0].item(),
+                                      global_step=(batch_idx * batch_size + b) * N_HOURS_Y + t)
+
+            del result_data, c_m, pollution_values_2d
+
         all_y_phy.append(y_phy_batch)
         del y_phy_batch
 
-    
-        # Save as .pkl file
     with open(output_file, "wb") as f:
         pickle.dump(all_y_phy, f)
     print(f"y_phy for all batches saved to {output_file}")
-
-    writer.close()
-
-def precompute_y_phy_for_all_batches_eq2(
-    all_dataset_loader, chunk_dataset_loader,
-    output_file="output.pkl", log_dir="runs/y_phy_tracking"
-):
-
-    print("Computing y phy with equation 2...")
-    writer = SummaryWriter(log_dir=log_dir)
-    all_y_phy = []
-    with open("physics_outputs/testing_empty.pkl", "wb") as f:
-        pickle.dump(all_y_phy, f)
-    # Step 1: Compute global min/max values
-    vx_min, vx_max, vy_min, vy_max = compute_global_min_max_vx_vy(all_dataset_loader)
-    # Convert to (x, y) in km
-    x_breukelen, y_breukelen = latlon_to_xy(LAT_TUINDORP, LON_TUINDORP, LAT_BREUKELEN, LON_BREUKELEN)
-    x_tuindorp, y_tuindorp = 0, 0  # Set Tuindorp as the origin
-
-    advection_pde = PDE({"c": "- vx * d_dx(c) - vy * d_dy(c)"}, consts={"vx": 0, "vy": 0})
-    # Define spatial grid for a region of 15x15 km (adjust based on domain)
-    grid = CartesianGrid([[-15, 5], [-5, 15]], [20, 20])  # 20x20 grid 
-
-    
-    for batch_idx, (u, _) in enumerate(chunk_dataset_loader):
-        print(f"Processing batch {batch_idx + 1}/{len(chunk_dataset_loader)}")
-        batch_size = u.shape[0]
-        y_phy_batch = torch.zeros((batch_size, N_HOURS_Y, 1), device=u.device)
-
-        vx, vy = get_scaled_vx_vy(u, vx_min, vx_max, vy_min, vy_max)
-
-        for b in range(batch_size):
-            print(f"Processing batch {batch_idx + 1}/{len(chunk_dataset_loader)}, sample {b + 1}/{batch_size}")
-            
-            # Extract the intitial pollution levels at Tuindorp and Breukelen at 1 hour before prediction
-            C_tuindorp = u[b, -N_HOURS_Y - 1, NO2_TUINDORP_IDX].numpy()
-            C_breukelen = u[b, -N_HOURS_Y - 1, NO2_BREUKELEN_IDX].numpy()
-            vx_output = vx[:, -N_HOURS_Y:]
-            vy_output = vy[:, -N_HOURS_Y:]
-            # create pollution field with grid and initial pollution values
-            pollution_values_2d = create_pollution_field(grid, C_tuindorp, C_breukelen, x_tuindorp, y_tuindorp, x_breukelen, y_breukelen)
-            c_m = ScalarField(grid, pollution_values_2d)
-
-            for t in range(N_HOURS_Y):
-                # Set vx, vy from KNMI predictions at time t (relative to start of prediction horizon)
-                advection_pde.consts["vx"] = float(vx_output[b, t].numpy())
-                advection_pde.consts["vy"] = float(vy_output[b, t].numpy())
-
-                # solve the pde and update c_m for the next timestep
-                result_data = advection_pde.solve(c_m, t_range=t, dt = 0.001, tracker=None).data
-                c_m.data = result_data
-
-                # Compute calculated pollution concentration from the grid at Breukelens coordinates
-                y_phy_batch[b, t, 0] = compute_pollution_at_breukelen(result_data, grid, x_breukelen, y_breukelen)
-
-                # Log some values to TensorBoard
-                if b % 5 == 0 and t % 2 == 0:  # Reduce logging overhead
-                    writer.add_scalar("y_phy/value", y_phy_batch[b, t, 0].item(), global_step=(batch_idx * batch_size + b) * N_HOURS_Y + t)
-            del result_data
-            del c_m
-            del pollution_values_2d
-        all_y_phy.append(y_phy_batch)
-        del y_phy_batch
-
-    
-        # Save as .pkl file
-    with open(output_file, "wb") as f:
-        pickle.dump(all_y_phy, f)
-    print(f"y_phy for all batches saved to {output_file}")
-
     writer.close()
 
 
@@ -340,20 +282,20 @@ def load_all_y_phy(phy_output_path, y_phy_filename):
     return all_y_phy
 
 
-def compute_pinn_phy_loss(y_pred, u, all_dataset_loader):
+def compute_pinn_phy_loss_utrecht(y_pred, u, all_dataset_loader, idx_dict):
 
     # --- 1. Extract necessary data from input tensor 'u' ---
     output_idx_start = N_HOURS_U - N_HOURS_Y + 1
     x_breukelen, y_breukelen = latlon_to_xy(LAT_TUINDORP, LON_TUINDORP, LAT_BREUKELEN, LON_BREUKELEN)
     delta_x = abs(x_breukelen - 0)  # Tuindorp is at (0, 0)
     delta_y = abs(y_breukelen - 0)  # Tuindorp is at (0, 0)
-    vx_min, vx_max, vy_min, vy_max = compute_global_min_max_vx_vy(all_dataset_loader)
-    vx, vy = get_scaled_vx_vy(u, vx_min, vx_max, vy_min, vy_max)
+    vx_min, vx_max, vy_min, vy_max = compute_global_min_max_vx_vy(all_dataset_loader, idx_dict=idx_dict)
+    vx, vy = get_scaled_vx_vy(u, vx_min, vx_max, vy_min, vy_max, idx_dict=idx_dict)
     vx_output = vx[:, -N_HOURS_Y:]
     vy_output = vy[:, -N_HOURS_Y:]
     
-    c_tuindorp_t = u[:, -N_HOURS_Y:, NO2_TUINDORP_IDX]
-    c_breukelen_hist_t48 = u[:, output_idx_start -1, NO2_BREUKELEN_IDX].unsqueeze(1) # u[:, 48, :].unsqueeze(1) -> (batch, 1)
+    c_tuindorp_t = u[:, -N_HOURS_Y:, idx_dict[f"NO2_TUINDORP_IDX"]]
+    c_breukelen_hist_t48 = u[:, output_idx_start -1, idx_dict[f"NO2_BREUKELEN_IDX"]].unsqueeze(1) # u[:, 48, :].unsqueeze(1) -> (batch, 1)
 
     if y_pred.dim() == 3 and y_pred.shape[-1] == 1:
         y_pred_squeezed = y_pred.squeeze(-1)
@@ -388,4 +330,69 @@ def compute_pinn_phy_loss(y_pred, u, all_dataset_loader):
     phy_loss = torch.mean(residual**2)
 
     return phy_loss
-    
+
+def compute_pinn_phy_loss_multi(
+    y_pred, u, all_dataset_loader, station_names, main_station, idx_dict
+):
+    """
+    Generalized physics loss using least squares gradient from multiple stations.
+
+    Args:
+        y_pred: (batch, 24) or (batch, 24, 1)
+        u: input tensor (batch, T, features)
+        all_dataset_loader: for wind normalization
+        station_names: list of station names (e.g., ["tuindorp", "breukelen", "amsterdam"])
+        main_station: name of the main station (e.g., "breukelen")
+        idx_dict: dictionary with feature indices (e.g., UTRECHT_IDX or AMSTERDAM_IDX)
+    """
+    if y_pred.dim() == 3 and y_pred.shape[-1] == 1:
+        y_pred_squeezed = y_pred.squeeze(-1)
+    else:
+        y_pred_squeezed = y_pred
+
+    output_idx_start = N_HOURS_U - N_HOURS_Y + 1
+    vx_min, vx_max, vy_min, vy_max = compute_global_min_max_vx_vy(all_dataset_loader)
+    vx, vy = get_scaled_vx_vy(u, vx_min, vx_max, vy_min, vy_max)
+    vx_output = vx[:, -N_HOURS_Y:]
+    vy_output = vy[:, -N_HOURS_Y:]
+
+    # Get lat/lon and NO2 index of the main station
+    lat_main = globals()[f"LAT_{main_station.upper()}"]
+    lon_main = globals()[f"LON_{main_station.upper()}"]
+    idx_main = idx_dict[f"NO2_{main_station.upper()}_IDX"]
+
+    # Set origin at main station
+    c_main_hist = u[:, output_idx_start - 1, idx_main].unsqueeze(1)
+    c_main_full = torch.cat([c_main_hist, y_pred_squeezed], dim=1)
+    dcdt = torch.diff(c_main_full, dim=1)
+
+    delta_c_list = []
+    coords = []
+
+    for station in station_names:
+        if station == main_station:
+            continue
+        lat = globals()[f"LAT_{station.upper()}"]
+        lon = globals()[f"LON_{station.upper()}"]
+        idx = idx_dict[f"NO2_{station.upper()}_IDX"]
+        x, y = latlon_to_xy(lat_main, lon_main, lat, lon)
+        coords.append([x, y])
+
+        c_other = u[:, -N_HOURS_Y:, idx]  # (batch, 24)
+        delta_c = c_other - y_pred_squeezed
+        delta_c_list.append(delta_c.unsqueeze(2))  # (batch, 24, 1)
+
+    delta_c_spatial = torch.cat(delta_c_list, dim=2)  # (batch, 24, N-1)
+    coords = torch.tensor(coords, dtype=torch.float32, device=u.device)  # (N-1, 2)
+
+    coords_T = coords.T  # (2, N-1)
+    A = torch.inverse(coords_T @ coords) @ coords_T  # (2, N-1)
+    grad_c = torch.einsum("ij,btk->bti", A, delta_c_spatial)  # (batch, 24, 2)
+    dcdx = grad_c[:, :, 0]
+    dcdy = grad_c[:, :, 1]
+
+    residual = dcdt + vx_output * dcdx + vy_output * dcdy
+    phy_loss = torch.mean(residual**2)
+    return phy_loss
+
+
