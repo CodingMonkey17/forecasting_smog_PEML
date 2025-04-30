@@ -325,7 +325,7 @@ def replace_WD_990_with_NaN(df: pd.DataFrame, col: str) -> pd.DataFrame:
 
 
 def tidy_raw_meteo_data(
-        df: pd.DataFrame, col: str, only_260: bool, year: str,
+        df: pd.DataFrame, col: str, meteo_station: str, year: str,
         subset_months, start_mon, end_mon, fill_NaNs = True):
     """
     Tidies the raw meteo data by various preprocessing steps:
@@ -336,28 +336,28 @@ def tidy_raw_meteo_data(
     - changing the date format to yyyy-mm-dd hh:mm;
     - setting the DateTime column as the index;
     - replacing 990 in the WD column with NaN;
-    - continuing with only the 260 station (the one used in the thesis):
+    - continuing with only weather station (the one used in the thesis):
     - filling NaN values with linear interpolation;
     - subsetting the data to the specified months;
     - renaming the column to the station name;
     - deleting February 29th and firework days;
-    - returning the 260 station data for the specified year and air component.
+    - returning the weather station data for the specified year and air component.
 
-    Here, station 260 is the De Bilt station used in the thesis. For the code
+    Here, station weather is the De Bilt station used in the thesis. For the code
     to potentially work with other stations, the station number should be changed
     together with some of the rest of the function calls to properly work.
 
     :param df: the DataFrame to tidy
     :param col: the column to keep in the DataFrame
-    :param only_260: whether to return only the 260 station data
+    :param meteo_station: the station number of the weather station
     :param year: the year of the data
     :param subset_months: whether to subset the months
     :param start_mon: the starting month for the subset
     :param end_mon: the ending month for the subset
     :param fill_NaNs: whether to fill NaN values with linear interpolation
-    :return: the 260 station DataFrame
+    :return: the weather station DataFrame
     """
-    df.columns = df.columns.str.strip() # remove leading and trailing ws in col names
+    
     if '# STN' in df.columns:           # change col name of stations
         df = df.rename(columns = {'# STN' : 'STN'})
     df = remove_unuseful_cols(df, ['T10N'])
@@ -365,26 +365,26 @@ def tidy_raw_meteo_data(
     df = change_meteo_date_format(df)   # create DateTime column
     df = df.set_index('DateTime')       # set DateTime as index
     df = make_index_timezone_naive(df)  # make the index timezone naive
-
+    print(df.head())
     df = df[[col, 'STN']].copy()        # keep only selected col and station name col
     if col == 'DD':                     # 990 (change in DD (or WD)) -> 0, for more even influence
         df = replace_WD_990_with_NaN(df, col)
 
-                                        # continue with the 260 station:
-    df_260 = remove_unuseful_cols(df[df['STN'] == 260], 'STN')
-
+                                        # continue with the weather station
+    df_meteo = remove_unuseful_cols(df[df['STN'] == int(meteo_station)], 'STN')
+    
     if fill_NaNs:
-        df_260 = fill_NaNs_linear(df_260).astype('float64')
+        df_meteo = fill_NaNs_linear(df_meteo).astype('float64')
 
     if subset_months:
-        df_260 = subset_month_range(df_260, start_mon, end_mon, year)
+        df_meteo = subset_month_range(df_meteo, start_mon, end_mon, year)
 
-    df_260 = df_260.rename(columns = {df.columns[0] : 'S260'})
-    df_260 = delete_feb_29th(df_260)
-    df_260 = delete_firework_days(df_260)
+    df_meteo = df_meteo.rename(columns = {df.columns[0] : f'S{meteo_station}'})
+    df_meteo = delete_feb_29th(df_meteo)
+    df_meteo = delete_firework_days(df_meteo)
 
-    if only_260:                        # return only the 260 station (only_260 var is unused)
-        return df_260
+    if meteo_station is not None:                        # return only the weather station 
+        return df_meteo
     else:
         return None
     

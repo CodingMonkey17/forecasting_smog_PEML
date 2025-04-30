@@ -1,23 +1,15 @@
 {
   "2017": {
     "pollution": {
-      "HOOFDDORP": {
-        "present": true,
-        "missing_count": 0,
-        "missing_percent": 0.0,
-        "zero_count": 0,
-        "zero_percent": 0.0,
-        "suspicious_patterns": []
-      },
-      "BADHOEVEDORP": {
-        "present": true,
-        "missing_count": 0,
-        "missing_percent": 0.0,
-        "zero_count": 0,
-        "zero_percent": 0.0,
-        "suspicious_patterns": []
-      },
       "OUDEMEER": {
+        "present": true,
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "zero_count": 0,
+        "zero_percent": 0.0,
+        "suspicious_patterns": []
+      },
+      "HAARLEM": {
         "present": true,
         "missing_count": 0,
         "missing_percent": 0.0,
@@ -51,23 +43,15 @@
   },
   "2018": {
     "pollution": {
-      "HOOFDDORP": {
-        "present": true,
-        "missing_count": 0,
-        "missing_percent": 0.0,
-        "zero_count": 0,
-        "zero_percent": 0.0,
-        "suspicious_patterns": []
-      },
-      "BADHOEVEDORP": {
-        "present": true,
-        "missing_count": 0,
-        "missing_percent": 0.0,
-        "zero_count": 0,
-        "zero_percent": 0.0,
-        "suspicious_patterns": []
-      },
       "OUDEMEER": {
+        "present": true,
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "zero_count": 0,
+        "zero_percent": 0.0,
+        "suspicious_patterns": []
+      },
+      "HAARLEM": {
         "present": true,
         "missing_count": 0,
         "missing_percent": 0.0,
@@ -101,7 +85,7 @@
   },
   "2020": {
     "pollution": {
-      "HOOFDDORP": {
+      "OUDEMEER": {
         "present": true,
         "missing_count": 0,
         "missing_percent": 0.0,
@@ -109,15 +93,7 @@
         "zero_percent": 0.0,
         "suspicious_patterns": []
       },
-      "BADHOEVEDORP": {
-        "present": true,
-        "missing_count": 0,
-        "missing_percent": 0.0,
-        "zero_count": 1,
-        "zero_percent": 0.027412280701754384,
-        "suspicious_patterns": []
-      },
-      "OUDEMEER": {
+      "HAARLEM": {
         "present": true,
         "missing_count": 0,
         "missing_percent": 0.0,
@@ -151,23 +127,15 @@
   },
   "2021": {
     "pollution": {
-      "HOOFDDORP": {
-        "present": true,
-        "missing_count": 0,
-        "missing_percent": 0.0,
-        "zero_count": 0,
-        "zero_percent": 0.0,
-        "suspicious_patterns": []
-      },
-      "BADHOEVEDORP": {
-        "present": true,
-        "missing_count": 0,
-        "missing_percent": 0.0,
-        "zero_count": 0,
-        "zero_percent": 0.0,
-        "suspicious_patterns": []
-      },
       "OUDEMEER": {
+        "present": true,
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "zero_count": 0,
+        "zero_percent": 0.0,
+        "suspicious_patterns": []
+      },
+      "HAARLEM": {
         "present": true,
         "missing_count": 0,
         "missing_percent": 0.0,
@@ -202,15 +170,7 @@
   },
   "2022": {
     "pollution": {
-      "HOOFDDORP": {
-        "present": true,
-        "missing_count": 0,
-        "missing_percent": 0.0,
-        "zero_count": 2,
-        "zero_percent": 0.05482456140350877,
-        "suspicious_patterns": []
-      },
-      "BADHOEVEDORP": {
+      "OUDEMEER": {
         "present": true,
         "missing_count": 0,
         "missing_percent": 0.0,
@@ -218,7 +178,7 @@
         "zero_percent": 0.0,
         "suspicious_patterns": []
       },
-      "OUDEMEER": {
+      "HAARLEM": {
         "present": true,
         "missing_count": 0,
         "missing_percent": 0.0,
@@ -252,15 +212,7 @@
   },
   "2023": {
     "pollution": {
-      "HOOFDDORP": {
-        "present": true,
-        "missing_count": 0,
-        "missing_percent": 0.0,
-        "zero_count": 1,
-        "zero_percent": 0.027412280701754384,
-        "suspicious_patterns": []
-      },
-      "BADHOEVEDORP": {
+      "OUDEMEER": {
         "present": true,
         "missing_count": 0,
         "missing_percent": 0.0,
@@ -268,7 +220,7 @@
         "zero_percent": 0.0,
         "suspicious_patterns": []
       },
-      "OUDEMEER": {
+      "HAARLEM": {
         "present": true,
         "missing_count": 0,
         "missing_percent": 0.0,
