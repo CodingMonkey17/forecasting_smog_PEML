@@ -50,7 +50,13 @@ AMSTERDAM_IDX = {
 }
 
 MULTI_STATION_IDX = {
-
+    'NO2_TUINDORP': 7,
+    'NO2_BREUKELEN': 4,
+    'NO2_OUDEMEER': 6,
+    'NO2_ZEGVELD': 8,
+    'NO2_KANTERSHOF': 5,
+    'WIND_DIR_IDX': 0,
+    'WIND_SPEED_IDX': 2
 }
 
 
