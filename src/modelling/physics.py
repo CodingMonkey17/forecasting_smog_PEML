@@ -578,8 +578,8 @@ def compute_pinn_phy_loss_multi(
         y_pred_squeezed = y_pred
 
     output_idx_start = N_HOURS_U - N_HOURS_Y + 1
-    vx_min, vx_max, vy_min, vy_max = compute_global_min_max_vx_vy(all_dataset_loader)
-    vx, vy = get_scaled_vx_vy(u, vx_min, vx_max, vy_min, vy_max)
+    vx_min, vx_max, vy_min, vy_max = compute_global_min_max_vx_vy(all_dataset_loader, idx_dict=idx_dict)
+    vx, vy = get_scaled_vx_vy(u, vx_min, vx_max, vy_min, vy_max, idx_dict=idx_dict)
     vx_output = vx[:, -N_HOURS_Y:]
     vy_output = vy[:, -N_HOURS_Y:]
 
