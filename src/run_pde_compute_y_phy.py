@@ -94,26 +94,41 @@ TEST_YEARS = [2021, 2022, 2023]
 
 LOSS_FUNC = "PDE_nmer_const" # PDE numerical solver with equation 1, of constant wind speed and direction
 NN_TYPE = "MLP" # choose from "MLP", "RNN", "LSTM", "GRU"
-torch.random.manual_seed(34)
+CITY = 'Multi' 
+#%%
+if CITY == 'Utrecht':
+    idx_dict = UTRECHT_IDX
+    station_names = ['tuindorp', 'breukelen']
+    main_station = 'breuklen'
+elif CITY == 'Amsterdam':
+    idx_dict = AMSTERDAM_IDX
+    station_names = ['oudemeer', 'haarlem']
+    main_station = 'haarlem'
+elif CITY == 'Multi':
+    idx_dict = MULTI_STATION_IDX
+    station_names = ['tuindorp', 'breukelen', 'zegveld', 'oudemeer', 'kantershof']
+    main_station = 'breukeln'
+else:
+    raise ValueError("CITY must be 'Utrecht', 'Amsterdam', or 'Multi'.")
 
 # %%
 if YEARS == [2017, 2018, 2020, 2021, 2022, 2023]:
     years = "allyears"
-    MINMAX_PATH = MINMAX_PATH_ALLYEARS
-    DATASET_PATH = DATASET_PATH_ALLYEARS
+    MINMAX_PATH = MINMAX_PATH_ALLYEARS_MULTI
+    DATASET_PATH = DATASET_PATH_ALLYEARS_MULTI
 
     
     print("Using all years")
     
 elif YEARS == [2017]:
     years = "2017"
-    MINMAX_PATH = MINMAX_PATH_2017
-    DATASET_PATH = DATASET_PATH_2017
+    MINMAX_PATH = MINMAX_PATH_2017_MULTI
+    DATASET_PATH = DATASET_PATH_2017_MULTI
     print("Using 2017")
 else:
     raise ValueError("Invalid years selected")
 
-Y_PHY_FILENAME = f"y_phy_batchsize16_{LOSS_FUNC}_{years}"
+Y_PHY_FILENAME = f"y_phy_batchsize16_{LOSS_FUNC}_{years}_Multi"
 MODEL_PATH_NAME = f'best_{NN_TYPE}_no2_{LOSS_FUNC}_{years}.pth'
 RESULTS_METRICS_FILENAME = f'results_{NN_TYPE}_no2_{LOSS_FUNC}_{years}.csv'
 BESTPARAMS_FILENAME = f'best_params_{NN_TYPE}_no2_{LOSS_FUNC}_{years}.txt'
@@ -123,10 +138,6 @@ PLOT_FILENAME = f'plot_{NN_TYPE}_no2_{LOSS_FUNC}_{years}.png'
 print("Y_PHY_FILENAME", Y_PHY_FILENAME)
 print("MINMAX_PATH: ", MINMAX_PATH)
 print("DATASET_PATH: ", DATASET_PATH)
-print("MODEL_PATH_NAME: ", MODEL_PATH_NAME)
-print("RESULTS_METRICS_FILENAME: ", RESULTS_METRICS_FILENAME)
-print("BESTPARAMS_FILENAME: ", BESTPARAMS_FILENAME)
-print("PLOT_FILENAME: ", PLOT_FILENAME)
 
 # %% [markdown]
 # ### **Load in data and create PyTorch *Datasets***
@@ -147,8 +158,6 @@ test_output_frames = get_dataframes('test', 'y', YEARS, DATASET_PATH)
 
 print("Successfully loaded data")
 
-# %%
-train_input_frames
 
 # %%
 train_dataset = TimeSeriesDataset(
@@ -182,51 +191,6 @@ del train_input_frames, train_output_frames
 del val_input_frames, val_output_frames
 del test_input_frames, test_output_frames
 
-# %%
-train_dataset.u
-
-# %%
-train_dataset.y
-
-# %%
-len(train_dataset.pairs[0][0])
-
-# %%
-train_dataset.pairs[0][0]
-
-# %%
-train_dataset.pairs[0][1]
-
-# %%
-# Assuming train_dataset.u[0] is a pandas Index object with column names
-column_names = list(train_dataset.u[0])  # Convert Index to list
-
-
-print("No2 tuindorp idx: ", column_names.index('NO2_TUINDORP'))
-print("No2 breukelen idx: ", column_names.index('NO2_BREUKELEN'))
-print("wind dir (dd) idx: ", column_names.index('DD'))
-print("wind speed (fh) idx: ", column_names.index('FH'))
-
-# check if the indices are the same as whats defined in config.py
-assert column_names.index('NO2_TUINDORP')== NO2_TUINDORP_IDX
-assert column_names.index('NO2_BREUKELEN') == NO2_BREUKELEN_IDX
-assert column_names.index('DD') == WIND_DIR_IDX
-assert column_names.index('FH') == WIND_SPEED_IDX
-print("Column indices are same as config.py")
-
-
-
-# %%
-train_dataset.u[0].iloc[:,NO2_TUINDORP_IDX]
-
-# %%
-train_dataset.u[0].iloc[:,NO2_BREUKELEN_IDX]
-
-# %%
-train_dataset.u[0].iloc[:,WIND_DIR_IDX]
-
-# %%
-train_dataset.u[0].iloc[:,WIND_SPEED_IDX]
 
 # %% [markdown]
 # ## Computing y_phy 2017 with eq 1 PDE numerical solver
@@ -266,9 +230,28 @@ print(f"Third 10 batches count: {len(third_10_batches)}")
 print(f"Fourth batch count: {len(fourth_10_batches)} (should be 11 if dataset has 41 batches)")
 
 
-phy_path = f"{PHY_OUTPUT_PATH}/{Y_PHY_FILENAME}_test1.pkl"
-print("first 10 batches phy_path: ", phy_path)
-precompute_y_phy_for_all_batches_eq2(all_dataset_loader= temp_train_loader, chunk_dataset_loader=first_10_batches, output_file = phy_path)
+batch_number = 1
+eq_num = 1
+if batch_number == 1:
+    chunk_data_to_use = first_10_batches
+    print(f"Using first 10 batches")
+elif batch_number == 2:
+    chunk_data_to_use = second_10_batches
+    print(f"Using second 10 batches")
+elif batch_number == 3:
+    chunk_data_to_use = third_10_batches
+    print(f"Using third 10 batches")
+elif batch_number == 4:
+    chunk_data_to_use = fourth_10_batches
+    print(f"Using fourth 10 batches")
+
+
+
+
+phy_path = f"{PHY_OUTPUT_PATH}/{Y_PHY_FILENAME}_{batch_number}.pkl"
+print(f"Chunk Number {batch_number} 10 batches phy_path: ", phy_path)
+precompute_y_phy_for_all_batches_multi(all_dataset_loader= temp_train_loader, chunk_dataset_loader=chunk_data_to_use, station_idx_dict= idx_dict,
+                                         equation_version= eq_num,output_file = phy_path)
 
 
 

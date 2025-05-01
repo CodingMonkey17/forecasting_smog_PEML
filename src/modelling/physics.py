@@ -7,6 +7,7 @@ import torch
 import math
 import numpy as np
 import pickle
+import matplotlib.pyplot as plt 
 
 
 def latlon_to_xy(lat1, lon1, lat2, lon2):
@@ -16,6 +17,83 @@ def latlon_to_xy(lat1, lon1, lat2, lon2):
     y = (lat2 - lat1) * (math.pi / 180) * R
     return x, y
 
+def extract_station_names_from_idx_dict(idx_dict):
+    """
+    Extracts all station names from an idx_dict with keys like 'NO2_TUINDORP_IDX'.
+
+    Parameters:
+    - idx_dict (dict): Dictionary with keys such as 'NO2_TUINDORP_IDX'
+
+    Returns:
+    - List of station names in lowercase (e.g., ['tuindorp', 'breukelen'])
+    """
+    station_names = []
+    for key in idx_dict:
+        if key.startswith("NO2_") and key.endswith("_IDX"):
+            station = key[len("NO2_"):-len("_IDX")].lower()
+            station_names.append(station)
+    return station_names
+
+def compute_linear_y_phy_multi(u, time_step=1, idx_dict=None):
+    """
+    Computes y_phy at Breukelen by modeling wind-based transport from multiple nearby stations.
+
+    Parameters:
+    - u: Tensor (batch_size, time_steps, features)
+    - time_step: Time resolution (in hours)
+    - idx_dict: Dict containing NO2_X_IDX and WIND_SPEED_IDX keys
+
+    Returns:
+    - y_phy: Tensor of shape (batch_size, N_HOURS_Y, 1)
+    """
+    assert idx_dict is not None, "idx_dict must be provided"
+
+    
+    
+    batch_size, total_time_steps, _ = u.shape
+    y_phy_total = torch.zeros((batch_size, N_HOURS_Y, 1), device=u.device)
+    contributing_stations = extract_station_names_from_idx_dict(idx_dict)
+
+    # Remove 'breukelen' since it's the destination
+    contributing_stations = [s for s in contributing_stations if s != "breukelen"]
+
+    # Destination (Breukelen)
+    lat_dst, lon_dst = LAT_BREUKELEN, LON_BREUKELEN
+
+    # Wind speed index
+    wind_speed = u[:, :, idx_dict["WIND_SPEED_IDX"]] * 3.6  # Convert to km/h
+
+    for station in contributing_stations:
+        lat_src = globals()[f"LAT_{station.upper()}"]
+        lon_src = globals()[f"LON_{station.upper()}"]
+
+        # Compute relative coordinates
+        x_src, y_src = latlon_to_xy(lat_dst, lon_dst, lat_src, lon_src)
+        distance = math.sqrt(x_src**2 + y_src**2)
+
+        # Get NO2 index
+        no2_idx = idx_dict[f"NO2_{station.upper()}_IDX"]
+        pollution = u[:, :, no2_idx]
+
+        # Travel time per sample and time step
+        travel_time = distance / (wind_speed + 1e-6)
+        time_shifts = torch.ceil(travel_time / time_step).long()
+        time_shifts = torch.clamp(time_shifts, min=0, max=N_HOURS_U - N_HOURS_Y)
+
+        # Build the y_phy contribution from this station
+        y_phy_station = torch.zeros((batch_size, N_HOURS_Y, 1), device=u.device)
+        for b in range(batch_size):
+            for t in range(N_HOURS_Y):
+                shift_t = time_shifts[b, -N_HOURS_Y + t]
+                src_idx = max(0, N_HOURS_U - N_HOURS_Y - shift_t + t)
+                y_phy_station[b, t, 0] = pollution[b, src_idx]
+
+        # Sum contribution (simple average here)
+        y_phy_total += y_phy_station
+
+    # Average across contributing stations
+    y_phy = y_phy_total / len(contributing_stations)
+    return y_phy
 
 
 def compute_linear_y_phy_utrecht(u, time_step=1, idx_dict=None):
@@ -60,8 +138,6 @@ def compute_linear_y_phy_utrecht(u, time_step=1, idx_dict=None):
 
     return y_phy
 
-def compute_linear_y_phy_multi():
-    pass
 
 # Function to compute pollution concentration at Breukelen
 def compute_pollution_at_breukelen(result_data, grid, x_breukelen, y_breukelen):
@@ -134,6 +210,35 @@ def create_pollution_field(grid, C_tuindorp, C_breukelen, x_tuindorp, y_tuindorp
             pollution_values_2d[i, j] = get_linear_interpolate(x, y, C_tuindorp, C_breukelen, x_tuindorp, y_tuindorp, x_breukelen, y_breukelen)
     return pollution_values_2d
 
+def create_pollution_field_multi(grid, station_coords, station_pollutions, power=2):
+    """
+    Creates a 2D pollution field using inverse-distance weighted interpolation from multiple stations.
+
+    Parameters:
+    - grid: CartesianGrid object defining the spatial grid.
+    - station_coords: List of (x, y) tuples for station positions (in km, relative to origin).
+    - station_pollutions: List of pollution values (same order as station_coords).
+    - power: Power for inverse-distance weighting (default: 2)
+
+    Returns:
+    - pollution_values_2d: 2D numpy array representing the pollution field.
+    """
+    pollution_values_2d = np.zeros(grid.shape)
+    for i in range(grid.shape[0]):
+        for j in range(grid.shape[1]):
+            x, y = grid.axes_coords[0][i], grid.axes_coords[1][j]
+            weights = []
+            values = []
+            for (x_s, y_s), pollution in zip(station_coords, station_pollutions):
+                dist = np.sqrt((x - x_s) ** 2 + (y - y_s) ** 2) + 1e-6  # avoid divide by zero
+                weights.append(1 / dist ** power)
+                values.append(pollution)
+            weights = np.array(weights)
+            values = np.array(values)
+            pollution_values_2d[i, j] = np.sum(weights * values) / np.sum(weights)
+    return pollution_values_2d
+
+
 def compute_global_min_max_vx_vy(dataset_loader, idx_dict):
     """ Compute global min and max for vx and vy across the entire dataset. """
     vx_min, vx_max = float('inf'), float('-inf')
@@ -166,6 +271,128 @@ def get_scaled_vx_vy(u, vx_min, vx_max, vy_min, vy_max, idx_dict):
     vy = (vy - vy_min) / (vy_max - vy_min + 1e-8)
     return vx, vy
 
+
+
+def precompute_y_phy_for_all_batches_multi(
+    all_dataset_loader,
+    chunk_dataset_loader,
+    station_idx_dict,
+    equation_version=1,
+    output_file="output.pkl",
+    log_dir="runs/y_phy_tracking",
+    grid_fig_path="grid_layout.png"
+):
+    assert equation_version in [1, 2], "Only equation_version 1 or 2 is supported."
+
+    print(f"Computing y_phy MULTI CITIY with equation {equation_version}...")
+    writer = SummaryWriter(log_dir=log_dir)
+    all_y_phy = []
+
+    vx_min, vx_max, vy_min, vy_max = compute_global_min_max_vx_vy(all_dataset_loader, station_idx_dict)
+
+    # Compute relative station positions from Breukelen
+    all_stations = extract_station_names_from_idx_dict(station_idx_dict)
+    other_stations = [s for s in all_stations if s != "breukelen"]
+    station_coords = {}
+
+    for station in other_stations:
+        lat = globals()[f"LAT_{station.upper()}"]
+        lon = globals()[f"LON_{station.upper()}"]
+        x, y = latlon_to_xy(LAT_BREUKELEN, LON_BREUKELEN, lat, lon)
+        station_coords[station] = (x, y)
+    
+    # Breukelen at origin
+    station_coords["breukelen"] = (0, 0)
+
+    # Determine bounds with margin
+    xs, ys = zip(*station_coords.values())
+    x_min, x_max = min(xs) - 5, max(xs) + 5
+    y_min, y_max = min(ys) - 5, max(ys) + 5
+
+    grid = CartesianGrid([[x_min, x_max], [y_min, y_max]], [20, 20])
+
+    # PDE setup
+    advection_pde = PDE({"c": "- vx * d_dx(c) - vy * d_dy(c)"}, consts={"vx": 0, "vy": 0})
+    x_breukelen, y_breukelen = 0, 0
+
+    for batch_idx, (u, _) in enumerate(chunk_dataset_loader):
+        print(f"Processing batch {batch_idx + 1}/{len(chunk_dataset_loader)}")
+        batch_size = u.shape[0]
+        y_phy_batch = torch.zeros((batch_size, N_HOURS_Y, 1), device=u.device)
+
+        vx, vy = get_scaled_vx_vy(u, vx_min, vx_max, vy_min, vy_max, station_idx_dict)
+        vx_output = vx[:, -N_HOURS_Y:]
+        vy_output = vy[:, -N_HOURS_Y:]
+
+        for b in range(batch_size):
+            print(f"  Sample {b + 1}/{batch_size}")
+
+            # Create field with pollution from all stations except Breukelen
+            pollution_values_2d = np.zeros(grid.shape)
+
+            station_names = extract_station_names_from_idx_dict(station_idx_dict)
+            # 1. Define coordinates relative to Breukelen
+            station_coords = []
+            station_pollutions = []
+
+            for station in station_names:  # station_names should include all surrounding stations
+                if station == "breukelen":
+                    x, y = 0.0, 0.0  # Origin
+                else:
+                    lat, lon = globals()[f"LAT_{station.upper()}"], globals()[f"LON_{station.upper()}"]  
+                    x, y = latlon_to_xy(LAT_BREUKELEN, LON_BREUKELEN, lat, lon)
+                
+                station_coords.append((x, y))
+                
+                # 2. Extract pollution value at the current timestep
+                station_key = f"NO2_{station.upper()}_IDX"
+                pollution_val = u[b, -N_HOURS_Y - 1, station_idx_dict[station_key]].item()  # .item() to get scalar
+                
+                station_pollutions.append(pollution_val)
+                print(f"Station: {station}, Pollution: {pollution_val}, Coordinates: ({x}, {y})")
+
+            # 3. Create the pollution field
+            pollution_values_2d = create_pollution_field_multi(grid, station_coords, station_pollutions)
+            c_m = ScalarField(grid, pollution_values_2d)
+
+            # Save initial concentration field as image
+            if batch_idx == 0 and b == 0:
+                fig, ax = plt.subplots(figsize=(6, 6))
+                c_m.plot(ax=ax)
+                ax.set_title(f"Initial Pollution Concentration Field with boundaries")
+                ax.set_xlabel("X (km)")
+                ax.set_ylabel("Y (km)")
+                plt.tight_layout()
+                plt.savefig("initial_pollution_field.png")
+                plt.close()
+                print("Saved initial pollution field to initial_pollution_field.png")
+                print('grid created with boundaries:', [x_min, x_max], [y_min, y_max])
+
+            for t in range(N_HOURS_Y):
+                vx_t = vx[b, -N_HOURS_Y - 1].item() if equation_version == 1 else vx_output[b, t].item()
+                vy_t = vy[b, -N_HOURS_Y - 1].item() if equation_version == 1 else vy_output[b, t].item()
+
+                advection_pde.consts["vx"] = vx_t
+                advection_pde.consts["vy"] = vy_t
+
+                result_data = advection_pde.solve(c_m, t_range=t, dt=0.001, tracker=None).data
+                c_m.data = result_data
+
+                y_phy_batch[b, t, 0] = compute_pollution_at_breukelen(result_data, grid, x_breukelen, y_breukelen)
+
+                if b % 5 == 0 and t % 2 == 0:
+                    writer.add_scalar("y_phy/value", y_phy_batch[b, t, 0].item(),
+                                      global_step=(batch_idx * batch_size + b) * N_HOURS_Y + t)
+
+            del result_data, c_m, pollution_values_2d
+
+        all_y_phy.append(y_phy_batch)
+        del y_phy_batch
+
+    with open(output_file, "wb") as f:
+        pickle.dump(all_y_phy, f)
+    print(f"y_phy for all batches saved to {output_file}")
+    writer.close()
 
 
 
