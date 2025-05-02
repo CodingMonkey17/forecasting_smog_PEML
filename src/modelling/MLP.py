@@ -171,13 +171,14 @@ class BasicMLP(nn.Module):
         mean_mse = total_mse_loss / len(test_loader)  # Mean MSE over batches
         rmse_loss = mean_mse ** 0.5
 
+        
         smape_loss = (smape_loss / total_elements) * 100  # Average over all elements and convert to %
 
         total_test_time = time.time() - start_test_time  # Total inference time
         
-        print(f"Test MSE Loss: {mse_loss.item():.6f}")
+        print(f"Test MSE Loss: {mean_mse:.6f}")
         print(f"Test RMSE Loss: {rmse_loss:.6f}")
         print(f"Test SMAPE Loss: {smape_loss:.6f}%")
         print(f"Total Inference Time: {total_test_time:.2f} seconds")
 
-        return mse_loss.item(), rmse_loss, smape_loss, total_test_time
+        return mean_mse, rmse_loss, smape_loss, total_test_time

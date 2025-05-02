@@ -24,7 +24,7 @@ from .PrintManager import PrintManager
 # from .plots import plot_flexibility
 # from .plots import plot_losses_normalised
 
-
+from modelling.initialise import *
 from .GRU import GRU
 from .HGRU import HGRU
 

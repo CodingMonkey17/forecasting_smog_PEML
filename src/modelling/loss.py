@@ -60,79 +60,6 @@ def get_y_phy_batch(all_y_phy, batch_idx):
     return all_y_phy[batch_idx]
     
 
-def compute_loss_utrecht(y_pred, y_true, u, loss_function, lambda_phy, all_y_phy, batch_idx, train_loader = None, 
-                 idx_dict = None, station_names = None, main_station = None, basic_mse_loss = None, device = None):
-    if loss_function == "MSE":
-        # print(basic_mse_loss)
-            return basic_mse_loss
-
-    elif loss_function == "LinearShift_MSE":
-        y_phy = compute_linear_y_phy_utrecht(u, time_step = 1, idx_dict= idx_dict).to(device)
-        phy_loss = mse_loss(y_pred, y_phy) # L_phy (y_pred, y_phy) = MSE(y_pred, y_phy)
-        total_weighted_loss = compute_weighted_total_loss(basic_mse_loss, phy_loss, lambda_phy, u) # L = L_mse + lambda_phy * L_phy
-        return total_weighted_loss
-        
-    elif loss_function == "PDE_nmer_const" or loss_function == "PDE_nmer_piece":
-        # Ensure y_phy is loaded
-        if all_y_phy is None:
-            print("Error: all_y_phy is None. Please load the y_phy values first.")
-            return None
-        y_phy = get_y_phy_batch(all_y_phy, batch_idx).to(device)
-
-        # Compute the loss
-        phy_loss = mse_loss(y_pred, y_phy)
-        total_weighted_loss = compute_weighted_total_loss(basic_mse_loss, phy_loss, lambda_phy, u)
-
-        return total_weighted_loss
-    elif loss_function == "PINN":
-        # Calculate the physics loss using the PDE
-        
-        if train_loader is None:
-            print("Error: train_loader is None. Please provide the train_loader.")
-            return None
-        
-        phy_loss = compute_pinn_phy_loss_utrecht(y_pred, u, train_loader, idx_dict=idx_dict).to(device)
-        # Combine the losses
-        total_weighted_loss = compute_weighted_total_loss(basic_mse_loss, phy_loss, lambda_phy, u)
-        return total_weighted_loss
-    else:
-        raise ValueError(f"Unknown loss function: {loss_function}. Supported functions are: MSE, LinearShift_MSE, PDE_nmer_const, PDE_nmer_piece, PINN.")
-                         
-def compute_loss_multi(y_pred, y_true, u, loss_function, lambda_phy, all_y_phy, batch_idx, train_loader = None, 
-                 idx_dict = None, station_names = None, main_station = None, basic_mse_loss = None, device = None):
-    if loss_function == "MSE":
-        # print(basic_mse_loss)
-        return basic_mse_loss
-
-    elif loss_function == "LinearShift_MSE":
-        y_phy = compute_linear_y_phy_multi(u, time_step = 1, idx_dict= idx_dict).to(device)
-        phy_loss = mse_loss(y_pred, y_phy) # L_phy (y_pred, y_phy) = MSE(y_pred, y_phy)
-        total_weighted_loss = compute_weighted_total_loss(basic_mse_loss, phy_loss, lambda_phy, u) # L = L_mse + lambda_phy * L_phy
-        return total_weighted_loss
-        
-    elif loss_function == "PDE_nmer_const" or loss_function == "PDE_nmer_piece":
-        # Ensure y_phy is loaded
-        if all_y_phy is None:
-            print("Error: all_y_phy is None. Please load the y_phy values first.")
-            return None
-        y_phy = get_y_phy_batch(all_y_phy, batch_idx).to(device)
-
-        # Compute the loss
-        phy_loss = mse_loss(y_pred, y_phy)
-        total_weighted_loss = compute_weighted_total_loss(basic_mse_loss, phy_loss, lambda_phy, u)
-
-        return total_weighted_loss
-    elif loss_function == "PINN":
-        # Calculate the physics loss using the PDE
-        if train_loader is None:
-            print("Error: train_loader is None. Please provide the train_loader.")
-            return None
-        
-        
-        phy_loss = compute_pinn_phy_loss_multi(y_pred, u, train_loader, station_names=station_names, main_station=main_station, idx_dict=idx_dict).to(device)
-        # Combine the losses
-        total_weighted_loss = compute_weighted_total_loss(basic_mse_loss, phy_loss, lambda_phy, u)
-        return total_weighted_loss
 
 # Computing loss for tuning, training, testing the model for actual prediction
 def compute_loss(y_pred, y_true, u, loss_function, lambda_phy, all_y_phy, batch_idx, train_loader = None, 
@@ -163,13 +90,40 @@ def compute_loss(y_pred, y_true, u, loss_function, lambda_phy, all_y_phy, batch_
     
     if station_names == None:
         return ValueError("No station names!")
-    elif station_names == ['tuindorp', 'breukelen']:
+    
+    if loss_function == "MSE":
+        # print(basic_mse_loss)
+        return basic_mse_loss
 
-        return compute_loss_utrecht(y_pred, y_true, u, loss_function, lambda_phy, all_y_phy, batch_idx, train_loader = train_loader, idx_dict = idx_dict, 
-                                    station_names = station_names, main_station = main_station, basic_mse_loss= basic_mse_loss, device = device)
-    elif station_names == ['tuindorp', 'breukelen', 'zegveld', 'oudemeer', 'kantershof']:
-        return compute_loss_multi(y_pred, y_true, u, loss_function, lambda_phy, all_y_phy, batch_idx, train_loader = train_loader, idx_dict = idx_dict, 
-                                    station_names = station_names, main_station = main_station, basic_mse_loss= basic_mse_loss, device = device)
+    elif loss_function == "LinearShift_MSE":
+        y_phy = compute_linear_y_phy(u, time_step = 1, idx_dict= idx_dict, station_names=station_names, main_station=main_station).to(device)
+        phy_loss = mse_loss(y_pred, y_phy) # L_phy (y_pred, y_phy) = MSE(y_pred, y_phy)
+        total_weighted_loss = compute_weighted_total_loss(basic_mse_loss, phy_loss, lambda_phy, u) # L = L_mse + lambda_phy * L_phy
+        return total_weighted_loss
+        
+    elif loss_function == "PDE_nmer_const" or loss_function == "PDE_nmer_piece":
+        # Ensure y_phy is loaded
+        if all_y_phy is None:
+            print("Error: all_y_phy is None. Please load the y_phy values first.")
+            return None
+        y_phy = get_y_phy_batch(all_y_phy, batch_idx).to(device)
+
+        # Compute the loss
+        phy_loss = mse_loss(y_pred, y_phy)
+        total_weighted_loss = compute_weighted_total_loss(basic_mse_loss, phy_loss, lambda_phy, u)
+
+        return total_weighted_loss
+    elif loss_function == "PINN":
+        # Calculate the physics loss using the PDE
+        if train_loader is None:
+            print("Error: train_loader is None. Please provide the train_loader.")
+            return None
+        
+        phy_loss = compute_pinn_phy_loss(y_pred, u, train_loader, station_names=station_names, main_station=main_station, idx_dict=idx_dict).to(device)
+        # Combine the losses
+        total_weighted_loss = compute_weighted_total_loss(basic_mse_loss, phy_loss, lambda_phy, u)
+        return total_weighted_loss
+    
 
 
 

@@ -73,7 +73,7 @@ HABROK = bool(0)                  # set to True if using HABROK; it will print
 
 
 print("BASE_DIR: ", BASE_DIR)
-print("MODEL_PATH: ", MODEL_PATH)
+
 print("Results path: ", RESULTS_PATH)
 
 torch.manual_seed(34)             # set seed for reproducibility
@@ -92,7 +92,7 @@ TRAIN_YEARS = [2017, 2018, 2020, 2021, 2022]
 VAL_YEARS = [2021, 2022, 2023]
 TEST_YEARS = [2021, 2022, 2023]
 
-LOSS_FUNC = "PDE_nmer_const" # PDE numerical solver with equation 1, of constant wind speed and direction
+LOSS_FUNC = "PDE_nmer_piece" # PDE numerical solver with equation 1, of constant wind speed and direction
 NN_TYPE = "MLP" # choose from "MLP", "RNN", "LSTM", "GRU"
 CITY = 'Multi' 
 #%%
@@ -116,7 +116,6 @@ if YEARS == [2017, 2018, 2020, 2021, 2022, 2023]:
     years = "allyears"
     MINMAX_PATH = MINMAX_PATH_ALLYEARS_MULTI
     DATASET_PATH = DATASET_PATH_ALLYEARS_MULTI
-
     
     print("Using all years")
     
@@ -248,22 +247,32 @@ elif batch_number == 4:
 
 
 
-phy_path = f"{PHY_OUTPUT_PATH}/{Y_PHY_FILENAME}_{batch_number}.pkl"
-print(f"Chunk Number {batch_number} 10 batches phy_path: ", phy_path)
-precompute_y_phy_for_all_batches_multi(all_dataset_loader= temp_train_loader, chunk_dataset_loader=chunk_data_to_use, station_idx_dict= idx_dict,
-                                         equation_version= eq_num,output_file = phy_path)
+# phy_path = f"{PHY_OUTPUT_PATH}/{Y_PHY_FILENAME}_{batch_number}.pkl"
+# print(f"Chunk Number {batch_number} 10 batches phy_path: ", phy_path)
+# precompute_y_phy_for_all_batches(all_dataset_loader= temp_train_loader, chunk_dataset_loader=chunk_data_to_use, station_idx_dict= idx_dict,
+#                                          station_names=station_names, main_station=main_station, 
+#                                          equation_version= eq_num,output_file = phy_path, grid_fig_path=f'initital_condition_{CITY}.png')
 
 
+# #%%
+# # see the first batch of y_phy by loading the file
+# file_1 = f"{PHY_OUTPUT_PATH}/y_phy_batchsize16_PDE_nmer_const_allyears_Multi_1.pkl"
+# with open(file_1, "rb") as f:
+#         y_phy_1 = pickle.load(f)
+# print(f"y_phy_1 shape: {len(y_phy_1)}")
+# #print the first batch
+# print(f"y_phy_1 first batch shape: {y_phy_1[0].shape}")
+# print(f"y_phy_1 first batch: {y_phy_1[0]}")
 
 # # %%
-# all_y_phy = load_all_y_phy(PHY_OUTPUT_PATH, Y_PHY_FILENAME)
-# # Save into one combined pickle file
-# combined_file = f"{PHY_OUTPUT_PATH}/{Y_PHY_FILENAME}_full.pkl"
-# with open(combined_file, "wb") as f:
-#     pickle.dump(all_y_phy, f)
+all_y_phy = load_all_y_phy(PHY_OUTPUT_PATH, Y_PHY_FILENAME)
+# Save into one combined pickle file
+combined_file = f"{PHY_OUTPUT_PATH}/{Y_PHY_FILENAME}_full.pkl"
+with open(combined_file, "wb") as f:
+    pickle.dump(all_y_phy, f)
 
-# print(f"Combined y_phy saved to: {combined_file}")
-# print(f"Total number of batches: {len(all_y_phy)}")
+print(f"Combined y_phy saved to: {combined_file}")
+print(f"Total number of batches: {len(all_y_phy)}")
 
 
 # # %%
@@ -276,7 +285,7 @@ precompute_y_phy_for_all_batches_multi(all_dataset_loader= temp_train_loader, ch
 
 # # Check total batches and shape of first batch
 # print(f"Total batches: {len(all_y_phy)}")
-# print(f"Shape of first batch: {all_y_phy[0].shape}")
+print(f"Shape of first batch: {all_y_phy[0].shape}")
 
 # %% [markdown]
 # ### Moved the y_phy file computed from habrok to local

@@ -1,6 +1,6 @@
 from pathlib import Path
 BASE_DIR = Path.cwd().parents[0] # set it to the root directory of the project, not src
-MODEL_PATH = BASE_DIR /"src" / "results" / "models"
+
 RESULTS_PATH = BASE_DIR / "src" / "results"
 
 
