@@ -8,26 +8,6 @@ DATA_UTRECHT_PATH = BASE_DIR / "data" / "data_combined" / "Utrecht"
 DATA_AMSTERDAM_PATH = BASE_DIR / "data" / "data_combined" / "Amsterdam"
 DATA_MULTI_PATH = BASE_DIR / "data" / "data_combined" / "Multi"
 
-MINMAX_PATH_2017 = DATA_UTRECHT_PATH / "only_2017"/ "pollutants_minmax_2017.csv"
-MINMAX_PATH_ALLYEARS = DATA_UTRECHT_PATH / "all_years"/ "pollutants_minmax_allyears.csv"
-MINMAX_PATH_FIRST3YEARS = DATA_UTRECHT_PATH / "first_3_years"/ "pollutants_minmax_2017_2018_2020.csv"
-DATASET_PATH_2017 = DATA_UTRECHT_PATH / "only_2017"
-DATASET_PATH_ALLYEARS = DATA_UTRECHT_PATH / "all_years"
-DATASET_PATH_FIRST3YEARS = DATA_UTRECHT_PATH / "first_3_years"
-
-# Amsterdam paths for testing transferability
-
-MINMAX_PATH_2017_AMS = DATA_AMSTERDAM_PATH / "only_2017"/ "pollutants_minmax_2017.csv"
-MINMAX_PATH_ALLYEARS_AMS = DATA_AMSTERDAM_PATH / "all_years"/ "pollutants_minmax_allyears.csv"
-DATASET_PATH_2017_AMS = DATA_AMSTERDAM_PATH / "only_2017"
-DATASET_PATH_ALLYEARS_AMS = DATA_AMSTERDAM_PATH / "all_years"
-
-# Multi paths for improving performance
-# just have all years data for now
-MINMAX_PATH_2017_MULTI = DATA_MULTI_PATH / "only_2017"/ "pollutants_minmax_2017.csv"
-MINMAX_PATH_ALLYEARS_MULTI = DATA_MULTI_PATH / "all_years"/ "pollutants_minmax_allyears.csv"
-DATASET_PATH_2017_MULTI = DATA_MULTI_PATH / "only_2017"
-DATASET_PATH_ALLYEARS_MULTI = DATA_MULTI_PATH / "all_years"
 
 
 PHY_OUTPUT_PATH = BASE_DIR / "src" / "physics_outputs"

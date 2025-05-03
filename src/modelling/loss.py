@@ -119,7 +119,7 @@ def compute_loss(y_pred, y_true, u, loss_function, lambda_phy, all_y_phy, batch_
             print("Error: train_loader is None. Please provide the train_loader.")
             return None
         
-        phy_loss = compute_pinn_phy_loss(y_pred, u, train_loader, station_names=station_names, main_station=main_station, idx_dict=idx_dict).to(device)
+        phy_loss = compute_pinn_phy_loss_new(y_pred, u, train_loader, station_names=station_names, main_station=main_station, idx_dict=idx_dict).to(device)
         # Combine the losses
         total_weighted_loss = compute_weighted_total_loss(basic_mse_loss, phy_loss, lambda_phy, u)
         return total_weighted_loss
