@@ -470,3 +470,128 @@ def compute_pinn_phy_loss_new(
     residual = dcdt + vx_output * dcdx + vy_output * dcdy - D * (d2cdx2 + d2cdy2) - S_t
     phy_loss = torch.mean(residual**2)
     return phy_loss
+
+
+def compute_source_term(t, k=1.0, sigma=0.75):
+    # Fixed peak centers
+    morning_center = 8.0     # Between 7–9 AM
+    evening_center = 17.25   # Between 4:30–6 PM
+
+    # Fixed shape with two Gaussian peaks
+    s_t = torch.exp(-((t - morning_center)**2) / (2 * sigma**2)) + \
+          torch.exp(-((t - evening_center)**2) / (2 * sigma**2))
+
+    # Scale with k
+    return k * s_t
+
+
+def compute_pinn_phy_loss_graph(
+    y_pred, u, all_dataset_loader, station_names, main_station, idx_dict, knn=2, k=1.0, D=0.1
+):
+    import torch.nn.functional as F
+
+    if y_pred.dim() == 3 and y_pred.shape[-1] == 1:
+        y_pred_squeezed = y_pred.squeeze(-1)
+    else:
+        y_pred_squeezed = y_pred
+
+    output_idx_start = N_HOURS_U - N_HOURS_Y + 1
+    vx_min, vx_max, vy_min, vy_max = compute_global_min_max_vx_vy(all_dataset_loader, idx_dict=idx_dict)
+    vx, vy = get_scaled_vx_vy(u, vx_min, vx_max, vy_min, vy_max, idx_dict=idx_dict)
+    vx_output = vx[:, -N_HOURS_Y:]
+    vy_output = vy[:, -N_HOURS_Y:]
+
+    lat_main = globals()[f"LAT_{main_station.upper()}"]
+    lon_main = globals()[f"LON_{main_station.upper()}"]
+    idx_main = idx_dict[f"NO2_{main_station.upper()}_IDX"]
+
+    c_main_hist = u[:, output_idx_start - 1, idx_main].unsqueeze(1)
+    c_main_full = torch.cat([c_main_hist, y_pred_squeezed], dim=1)
+    dcdt = torch.diff(c_main_full, dim=1)
+
+    coords = []
+    conc_stack = []
+    station_data = {}
+    main_station_index = None
+    
+    for i, station in enumerate(station_names):
+        lat = globals()[f"LAT_{station.upper()}"]
+        lon = globals()[f"LON_{station.upper()}"]
+        x, y = latlon_to_xy(lat_main, lon_main, lat, lon)
+        coords.append([x, y])
+        
+        idx = idx_dict[f"NO2_{station.upper()}_IDX"]
+        station_data[station] = {'coords': (x, y), 'idx': idx}
+        
+        if station == main_station:
+            main_station_index = i
+            conc_stack.append(y_pred_squeezed.unsqueeze(2))
+        else:
+            c_other = u[:, -N_HOURS_Y:, idx]
+            conc_stack.append(c_other.unsqueeze(2))
+            station_data[station]['delta_c'] = (c_other - y_pred_squeezed).unsqueeze(2)
+
+    coords = torch.tensor(coords, dtype=torch.float32, device=u.device)
+    conc_tensor = torch.cat(conc_stack, dim=2)
+
+    dist = torch.cdist(coords.unsqueeze(0), coords.unsqueeze(0)).squeeze(0)
+    knn_mask = torch.topk(dist, k=knn + 1, largest=False).indices
+
+    N = len(station_names)
+    A = torch.zeros(N, N, device=u.device)
+    for i in range(N):
+        for j in knn_mask[i]:
+            if i != j:
+                A[i, j] = torch.exp(-dist[i, j])
+
+    D_mat = torch.diag(A.sum(dim=1))
+    L = D_mat - A
+
+    laplacian_term = torch.einsum('ij,bti->btj', L, conc_tensor)
+    lap_c_main = laplacian_term[:, :, main_station_index]
+
+    delta_c_spatial = torch.cat(
+        [station_data[s]['delta_c'] for s in station_names if s != main_station], dim=2
+    )
+    coord_deltas = torch.tensor(
+        [station_data[s]['coords'] for s in station_names if s != main_station],
+        dtype=torch.float32,
+        device=u.device
+    )
+
+    A_spatial = torch.inverse(coord_deltas.T @ coord_deltas) @ coord_deltas.T
+    grad_c = torch.einsum("ij,btk->bti", A_spatial, delta_c_spatial)
+    dcdx = grad_c[:, :, 0]
+    dcdy = grad_c[:, :, 1]
+
+    
+    hour_vector = torch.arange(24, device=u.device).float()
+    S_t = compute_source_term(hour_vector, k=k)  # Your global/source strength parameter
+
+    residual = dcdt + vx_output * dcdx + vy_output * dcdy - D * lap_c_main - S_t
+    phy_loss = torch.mean(residual**2)
+    return phy_loss
+
+
+def compute_initial_condition_loss(y_pred, u, idx_dict, station_name):
+    """
+    Enforce initial condition at t = 0 using historical observation.
+
+    Args:
+        y_pred: (batch, 24) — model predictions for 24 future hours
+        u: input tensor (batch, T, features)
+        idx_dict: index map for station features
+        station_name: name of the main station (e.g., "breukelen")
+    Returns:
+        initial condition loss (scalar tensor)
+    """
+    idx_station = idx_dict[f"NO2_{station_name.upper()}_IDX"]
+
+    # Assume last time step of input (u) corresponds to t = 0
+    # That is: the last known observation before prediction starts
+    c_initial = u[:, -N_HOURS_Y, idx_station]  # (batch,)
+    c_pred_t0 = y_pred[:, 0]                   # (batch,)
+    
+    loss_ic = torch.mean((c_pred_t0 - c_initial) ** 2)
+    return loss_ic
+
