@@ -32,7 +32,7 @@ class BasicMLP(nn.Module):
 
         return outputs[:, -24:, :]  # Predict last 24 hours
 
-    def train_model(self, train_loader, val_loader, all_y_phy = None, epochs=50, lr=1e-3, weight_decay=1e-6, lambda_phy = 1e-5, lambda_ic =0, k= 2, D= 0.1, device="cpu", trial=None, 
+    def train_model(self, train_loader, val_loader, all_y_phy = None, epochs=50, lr=1e-3, weight_decay=1e-6, lambda_phy = 1e-5, lambda_ic =None, device="cpu", trial=None, 
                     station_names = ['tuindorp', 'breukelen'], main_station = 'breukelen', idx_dict = None):
         
         print(f"Using stations {station_names} for input and {main_station} as the main predicting station")
@@ -73,7 +73,7 @@ class BasicMLP(nn.Module):
                 optimizer.zero_grad()
 
                 output = self.forward(u)
-                loss= compute_loss(output, y, u, self.loss_function, lambda_phy = lambda_phy, lambda_ic= lambda_ic, k=k, D=D, all_y_phy = all_y_phy, batch_idx = batch_idx, train_loader= train_loader, 
+                loss= compute_loss(output, y, u, self.loss_function, lambda_phy = lambda_phy, lambda_ic= lambda_ic, all_y_phy = all_y_phy, batch_idx = batch_idx, train_loader= train_loader, 
                                    idx_dict = idx_dict ,station_names= station_names, main_station = main_station)  # Compute loss based on selected function
 
                 loss.backward()

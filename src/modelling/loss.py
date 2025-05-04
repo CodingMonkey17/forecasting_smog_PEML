@@ -35,7 +35,7 @@ def latlon_to_xy(lat1, lon1, lat2, lon2):
 
 
 
-def compute_weighted_total_loss(mse_loss = None, phy_loss = None, ic_loss = 0, lambda_phy = 1e-5, lambda_ic = 0, u = None):
+def compute_weighted_total_loss(mse_loss = None, phy_loss = None, ic_loss = 0, lambda_phy = 1e-5, lambda_ic = None, u = None):
     '''
     Computes the total loss as the sum of MSE and Physics loss, weighted by lambda_phy.
     - mse_loss: Mean Squared Error loss
@@ -46,6 +46,11 @@ def compute_weighted_total_loss(mse_loss = None, phy_loss = None, ic_loss = 0, l
     # warning in case anything is None
     if mse_loss is None or phy_loss is None or u is None:
         print('Warning: some of the inputs are None')
+    
+    # for models without initial condition loss, return only the MSE loss and phy loss
+    if lambda_ic is None:
+        return mse_loss + lambda_phy * phy_loss
+    
 
     # Total loss is the sum of MSE and Physics loss, weighted by lambda_phy
     total_loss = mse_loss + lambda_phy * phy_loss + lambda_ic * ic_loss
@@ -62,8 +67,8 @@ def get_y_phy_batch(all_y_phy, batch_idx):
 
 
 # Computing loss for tuning, training, testing the model for actual prediction
-def compute_loss(y_pred, y_true, u, loss_function, lambda_phy, lambda_ic, k, D, all_y_phy, batch_idx, train_loader = None, 
-                 idx_dict = None, station_names = None, main_station = None):
+def compute_loss(y_pred, y_true, u, loss_function, lambda_phy, all_y_phy, batch_idx, train_loader = None, 
+                 idx_dict = None, station_names = None, main_station = None, lambda_ic=None):
     """
     Computes loss function based on global variable setting.
     - y_pred: Predicted pollution level
@@ -85,15 +90,17 @@ def compute_loss(y_pred, y_true, u, loss_function, lambda_phy, lambda_ic, k, D, 
     u = u.to(device)
     basic_mse_loss = mse_loss(y_pred, y_true)
 
+    if loss_function == "MSE":
+        # print(basic_mse_loss)
+        return basic_mse_loss
+
     if idx_dict == None:
         return ValueError("No idx dict!")
     
     if station_names == None:
         return ValueError("No station names!")
     
-    if loss_function == "MSE":
-        # print(basic_mse_loss)
-        return basic_mse_loss
+    
 
     elif loss_function == "LinearShift_MSE":
         y_phy = compute_linear_y_phy(u, time_step = 1, idx_dict= idx_dict, station_names=station_names, main_station=main_station).to(device)
@@ -118,8 +125,8 @@ def compute_loss(y_pred, y_true, u, loss_function, lambda_phy, lambda_ic, k, D, 
         if train_loader is None:
             print("Error: train_loader is None. Please provide the train_loader.")
             return None
-        
-        phy_loss = compute_pinn_phy_loss_graph(y_pred, u, train_loader, station_names=station_names, main_station=main_station, idx_dict=idx_dict, k=k, D=D).to(device)
+        phy_loss = compute_pinn_phy_loss(y_pred, u, train_loader, station_names=station_names, main_station=main_station, idx_dict=idx_dict).to(device)
+        # phy_loss = compute_pinn_phy_loss_graph(y_pred, u, train_loader, station_names=station_names, main_station=main_station, idx_dict=idx_dict, k=k, D=D).to(device)
         # Combine the losses
         ic_loss = compute_initial_condition_loss(y_pred = y_pred, u=u, idx_dict=idx_dict, station_name=main_station).to(device)
         

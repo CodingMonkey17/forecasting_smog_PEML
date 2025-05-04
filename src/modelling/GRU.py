@@ -52,14 +52,17 @@ class GRU(nn.Module):
         predictions = []
         for idx in pred_indices:
             # Use hidden state at position idx to predict the next timestep
-            pred = self.dense(out[:, idx, :])
+            pred = self.dense(out[:, idx-1, :])
             predictions.append(pred)
         
         # Stack predictions along a new dimension and reshape to 
         # [batch_size, n_hours_y, n_output_units]
         return torch.stack(predictions, dim=1)
 
-    def train_model(self, train_loader, val_loader, all_y_phy = None, epochs=50, lr=1e-3, weight_decay=1e-6, lambda_phy = 1e-5, device="cpu", trial=None):
+    def train_model(self, train_loader, val_loader, all_y_phy = None, epochs=50, lr=1e-3, weight_decay=1e-6, lambda_phy = 1e-5, lambda_ic =None, device="cpu", trial=None, 
+                    station_names = ['tuindorp', 'breukelen'], main_station = 'breukelen', idx_dict = None):
+        
+        print(f"Using stations {station_names} for input and {main_station} as the main predicting station")
         self.to(device)
         optimizer = optim.Adam(self.parameters(), lr=lr, weight_decay=weight_decay)
 
@@ -73,8 +76,8 @@ class GRU(nn.Module):
             verbose=True
         )
         
-        # Add early stopping with patience=15 as per Table D.2
-        early_stop_patience = 50
+        # Add early stopping with patience=6 as per Table D.2
+        early_stop_patience = 15
         no_improve_count = 0
 
         best_val_loss = float("inf")
@@ -97,7 +100,8 @@ class GRU(nn.Module):
                 optimizer.zero_grad()
 
                 output = self.forward(u)
-                loss= compute_loss(output, y, u, self.loss_function, lambda_phy = lambda_phy, all_y_phy = all_y_phy, batch_idx = batch_idx, train_loader= train_loader)  # Compute loss based on selected function
+                loss= compute_loss(output, y, u, self.loss_function, lambda_phy = lambda_phy, lambda_ic= lambda_ic, all_y_phy = all_y_phy, batch_idx = batch_idx, train_loader= train_loader, 
+                                   idx_dict = idx_dict ,station_names= station_names, main_station = main_station)  # Compute loss based on selected function
 
                 loss.backward()
                 optimizer.step()
@@ -198,9 +202,9 @@ class GRU(nn.Module):
 
         total_test_time = time.time() - start_test_time  # Total inference time
         
-        print(f"Test MSE Loss: {mse_loss.item():.6f}")
+        print(f"Test MSE Loss: {mean_mse:.6f}")
         print(f"Test RMSE Loss: {rmse_loss:.6f}")
         print(f"Test SMAPE Loss: {smape_loss:.6f}%")
         print(f"Total Inference Time: {total_test_time:.2f} seconds")
 
-        return mse_loss.item(), rmse_loss, smape_loss, total_test_time
+        return mean_mse, rmse_loss, smape_loss, total_test_time
