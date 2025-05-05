@@ -202,7 +202,7 @@ def objective(trial):
     weight_decay = trial.suggest_loguniform("weight_decay", 1e-8, 1e-3)
     batch_size = trial.suggest_categorical("batch_size", [8, 16, 32, 64])  # Match the original hp['batch_sz']
     lambda_phy = trial.suggest_loguniform("lambda_phy", 1e-5, 1e-1)
-    lambda_ic = trial.suggest_loguniform("lambda_ic", 1e-5, 1e-1)
+    # lambda_ic = trial.suggest_loguniform("lambda_ic", 1e-5, 1e-1)
 
     # Create train & validation loaders (following the original code)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
@@ -224,7 +224,7 @@ def objective(trial):
         train_loader, val_loader, epochs=50,
         lr=lr, weight_decay=weight_decay,
         lambda_phy=lambda_phy,
-        lambda_ic=lambda_ic,
+        # lambda_ic=lambda_ic,
         device=device,
         trial=trial,
         idx_dict=idx_dict,
@@ -305,12 +305,12 @@ val_loader = DataLoader(val_dataset, batch_size=best_params["batch_size"], shuff
 # Train the model
 _, training_time, train_losses, val_losses = best_model.train_model(train_loader, val_loader, epochs=50, lr=best_params["lr"], 
                                                                     weight_decay=best_params["weight_decay"], lambda_phy= best_params['lambda_phy'], 
-                                                                    lambda_ic= best_params['lambda_ic'],device=device, 
+                                                                    device=device, 
                                                                     idx_dict= idx_dict, station_names = station_names, main_station = main_station)
 print(f"Training time: {training_time}")
 # Save the trained model
-torch.save(best_model.state_dict(), f"{MODEL_PATH}/{MODEL_PATH_NAME}")
-print(f"Model saved as {MODEL_PATH_NAME} in Model folder")
+# torch.save(best_model.state_dict(), f"{MODEL_PATH}/{MODEL_PATH_NAME}")
+# print(f"Model saved as {MODEL_PATH_NAME} in Model folder")
 
 # %% [markdown]
 # ## Plot Train-Val
@@ -346,7 +346,7 @@ plt.show()
 # Results saved in ``src/results/metrics/results_MLP_no2_MSE_allyears.csv``
 
 # %%
-best_model.load_state_dict(torch.load(f"{MODEL_PATH}/{MODEL_PATH_NAME}"))
+# best_model.load_state_dict(torch.load(f"{MODEL_PATH}/{MODEL_PATH_NAME}"))
 best_model.eval()
 
 # Create the DataLoader for the test dataset
@@ -356,7 +356,7 @@ test_loader = DataLoader(test_dataset, batch_size=best_params["batch_size"], shu
 df_minmax = pd.read_csv(MINMAX_PATH, sep=';')
 min_value = df_minmax["min"].values
 max_value = df_minmax["max"].values
-mse, rmse, smape, inference_time = best_model.test_model(test_loader, min_value=min_value, max_value=max_value, device="cpu")
+mse, rmse, smape, inference_time = best_model.test_model(test_loader, min_value=min_value, max_value=max_value, device=device)
 
 
 

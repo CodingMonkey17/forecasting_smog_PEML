@@ -489,25 +489,5 @@ def compute_pinn_phy_loss_graph(
     return phy_loss
 
 
-def compute_initial_condition_loss(y_pred, u, idx_dict, station_name):
-    """
-    Enforce initial condition at t = 0 using historical observation.
 
-    Args:
-        y_pred: (batch, 24) — model predictions for 24 future hours
-        u: input tensor (batch, T, features)
-        idx_dict: index map for station features
-        station_name: name of the main station (e.g., "breukelen")
-    Returns:
-        initial condition loss (scalar tensor)
-    """
-    idx_station = idx_dict[f"NO2_{station_name.upper()}_IDX"]
-
-    # Assume last time step of input (u) corresponds to t = 0
-    # That is: the last known observation before prediction starts
-    c_initial = u[:, -N_HOURS_Y, idx_station]  # (batch,)
-    c_pred_t0 = y_pred[:, 0]                   # (batch,)
-    
-    loss_ic = torch.mean((c_pred_t0 - c_initial) ** 2)
-    return loss_ic
 

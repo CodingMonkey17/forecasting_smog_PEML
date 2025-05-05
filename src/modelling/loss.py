@@ -35,7 +35,7 @@ def latlon_to_xy(lat1, lon1, lat2, lon2):
 
 
 
-def compute_weighted_total_loss(mse_loss = None, phy_loss = None, ic_loss = 0, lambda_phy = 1e-5, lambda_ic = None, u = None):
+def compute_weighted_total_loss(mse_loss = None, phy_loss = None, lambda_phy = 1e-5, u = None):
     '''
     Computes the total loss as the sum of MSE and Physics loss, weighted by lambda_phy.
     - mse_loss: Mean Squared Error loss
@@ -46,14 +46,11 @@ def compute_weighted_total_loss(mse_loss = None, phy_loss = None, ic_loss = 0, l
     # warning in case anything is None
     if mse_loss is None or phy_loss is None or u is None:
         print('Warning: some of the inputs are None')
-    
-    # for models without initial condition loss, return only the MSE loss and phy loss
-    if lambda_ic is None:
-        return mse_loss + lambda_phy * phy_loss
+
     
 
     # Total loss is the sum of MSE and Physics loss, weighted by lambda_phy
-    total_loss = mse_loss + lambda_phy * phy_loss + lambda_ic * ic_loss
+    total_loss = mse_loss + lambda_phy * phy_loss 
     return total_loss
 
 
@@ -127,10 +124,8 @@ def compute_loss(y_pred, y_true, u, loss_function, lambda_phy, all_y_phy, batch_
             return None
         phy_loss = compute_pinn_phy_loss(y_pred, u, train_loader, station_names=station_names, main_station=main_station, idx_dict=idx_dict).to(device)
         # phy_loss = compute_pinn_phy_loss_graph(y_pred, u, train_loader, station_names=station_names, main_station=main_station, idx_dict=idx_dict, k=k, D=D).to(device)
-        # Combine the losses
-        ic_loss = compute_initial_condition_loss(y_pred = y_pred, u=u, idx_dict=idx_dict, station_name=main_station).to(device)
         
-        total_weighted_loss = compute_weighted_total_loss(basic_mse_loss, phy_loss, ic_loss, lambda_phy, lambda_ic, u)
+        total_weighted_loss = compute_weighted_total_loss(basic_mse_loss, phy_loss, lambda_phy, u)
         return total_weighted_loss
     
 
