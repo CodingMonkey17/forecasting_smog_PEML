@@ -3,6 +3,8 @@ BASE_DIR = Path.cwd().parents[0] # set it to the root directory of the project, 
 
 RESULTS_PATH = BASE_DIR / "src" / "results"
 
+THESIS_PLOTS_PATH = BASE_DIR / "data" / "thesis_plots"
+
 
 DATA_UTRECHT_PATH = BASE_DIR / "data" / "data_combined" / "Utrecht"
 DATA_AMSTERDAM_PATH = BASE_DIR / "data" / "data_combined" / "Amsterdam"
