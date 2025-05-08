@@ -110,3 +110,63 @@ def check_station_indexes(column_names, idx_dict):
         print(f"{key} index matches in index: {value}")
     print("All station indexes match.")
     return True
+
+
+# a function to return paths for the case of transferability where models from Utrecht/Multi are used to predict Amsterdam
+def init_transferability_paths(model_city, transfer_city, years, loss_func, nn_type):
+    """
+    Initialise paths for the transferability case where models from one city are used to predict another city.
+    
+    Args:
+        model_city (str): The city from which the model is transferred ('Utrecht', 'Amsterdam', or 'Multi').
+        transfer_city (str): The city to which the model is transferred ('Utrecht', 'Amsterdam', or 'Multi').
+        years (list): List of years to include in the path.
+        loss_func (str): The loss function used in the model.
+        nn_type (str): The type of neural network used in the model.
+        
+    Returns:
+        dict: A dictionary containing initialised paths.
+    """
+    
+    if model_city == 'Utrecht':
+        idx_dict = UTRECHT_IDX
+        station_names = ['tuindorp', 'breukelen']
+        main_station = 'breukelen'
+        original_results_path = os.path.join(RESULTS_PATH, 'Utrecht')
+        model_path = os.path.join(original_results_path, 'models')
+    elif model_city == 'Multi':
+        idx_dict = MULTI_STATION_IDX
+        station_names = ['tuindorp', 'breukelen', 'zegveld', 'oudemeer', 'kantershof']
+        main_station = 'breukelen'
+        original_results_path = os.path.join(RESULTS_PATH, 'Multi')
+        model_path = os.path.join(original_results_path, 'models')
+    else:
+        raise ValueError("CITY must be 'Utrecht' or 'Multi'.")
+    
+    if transfer_city == 'Amsterdam':
+        data_path = DATA_AMSTERDAM_PATH
+        results_path = os.path.join(RESULTS_PATH, 'Amsterdam')
+    else:
+        raise ValueError("Transfer city must be 'Amsterdam'.")
+    
+    if years == [2017, 2018, 2020, 2021, 2022, 2023]:
+        years_str = "allyears"
+        minmax_path = os.path.join(data_path, "all_years", "pollutants_minmax_allyears.csv")
+        dataset_path = os.path.join(data_path, "all_years")
+    elif years == [2017]:
+        years_str = "2017"
+        minmax_path = os.path.join(data_path, "only_2017", "pollutants_minmax_2017.csv")
+        dataset_path = os.path.join(data_path, "only_2017")
+    elif years == [2017, 2018, 2020]:
+        years_str = "first_3_years"
+        minmax_path = os.path.join(data_path, "first_3_years", "pollutants_minmax_2017_2018_2020.csv")
+        dataset_path = os.path.join(data_path, "first_3_years")
+    else:
+        raise ValueError("Invalid years selected")
+    y_phy_filename = f"y_phy_batchsize16_{loss_func}_{years_str}_{model_city}"
+    model_filename = f'best_{nn_type}_no2_{loss_func}_{years_str}_{model_city}.pth'
+    results_metrics_filename = f'results_{nn_type}_no2_{loss_func}_{years_str}_trans_{model_city}_{transfer_city}.csv'
+    bestparams_filename = f'best_params_{nn_type}_no2_{loss_func}_{years_str}_{model_city}.txt'
+    plot_filename = f'plot_{nn_type}_no2_{loss_func}_{years_str}_trans_{model_city}_{transfer_city}.png'
+
+    return years_str, idx_dict, station_names, main_station, original_results_path, results_path, model_path, dataset_path, minmax_path, y_phy_filename, model_filename, results_metrics_filename, bestparams_filename, plot_filename

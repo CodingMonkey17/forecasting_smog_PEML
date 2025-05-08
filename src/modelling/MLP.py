@@ -131,54 +131,63 @@ class BasicMLP(nn.Module):
         return best_val_loss, total_train_time, train_losses, val_losses
 
 
+
     def test_model(self, test_loader, min_value=None, max_value=None, device="cpu"):
         self.to(device)
         self.eval()
-        mse_loss_fn =nn.MSELoss(reduction="mean")
-        rmse_loss = 0.0
-        smape_loss = 0.0
+        mse_loss_fn = nn.MSELoss(reduction="mean")
+
         total_elements = 0
-        epsilon = 1e-6  # To prevent division by zero
-        total_mse_loss = 0.0 
-        start_test_time = time.time()  # Start timing inference
+        total_mse_loss = 0.0
+        smape_loss = 0.0
+        epsilon = 1e-6
+
+        inference_times = []
 
         with torch.no_grad():
             for u, y in test_loader:
                 u, y = u.to(device), y.to(device)
+
+                # Time individual forward pass
+                start_time = time.time()
                 output = self.forward(u)
+                end_time = time.time()
 
-                # Compute SMAPE BEFORE denormalization
+                inference_times.append(end_time - start_time)
+
+                # Compute SMAPE before denormalization
                 abs_diff = torch.abs(y - output)
-                sum_abs = torch.abs(y) + torch.abs(output) + epsilon  # Avoid division by zero
+                sum_abs = torch.abs(y) + torch.abs(output) + epsilon
                 smape_batch = torch.sum(2 * abs_diff / sum_abs).item()
-
                 smape_loss += smape_batch
-                total_elements += y.numel()  # Count total number of elements
+                total_elements += y.numel()
 
-                # Denormalize for RMSE and MSE calculation
+                # Denormalize
                 if min_value is not None and max_value is not None:
                     min_value_tensor = torch.tensor(min_value, device=device, dtype=output.dtype)
                     max_value_tensor = torch.tensor(max_value, device=device, dtype=output.dtype)
                     output = output * (max_value_tensor - min_value_tensor) + min_value_tensor
                     y = y * (max_value_tensor - min_value_tensor) + min_value_tensor
+
                 output = output.to(torch.float64)
                 y = y.to(torch.float64)
 
                 mse_loss = mse_loss_fn(output, y)
-                total_mse_loss += mse_loss.item()  # Sum up MSE
-        
-        # Final RMSE calculation: take the square root of the mean MSE
-        mean_mse = total_mse_loss / len(test_loader)  # Mean MSE over batches
+                total_mse_loss += mse_loss.item()
+
+        # Final metrics
+        mean_mse = total_mse_loss / len(test_loader)
         rmse_loss = mean_mse ** 0.5
+        smape_loss = (smape_loss / total_elements) * 100
 
-        
-        smape_loss = (smape_loss / total_elements) * 100  # Average over all elements and convert to %
+        # Inference timing metrics
+        inference_times = np.array(inference_times)
+        mean_inference_time = inference_times.mean()
+        std_inference_time = inference_times.std()
 
-        total_test_time = time.time() - start_test_time  # Total inference time
-        
         print(f"Test MSE Loss: {mean_mse:.6f}")
         print(f"Test RMSE Loss: {rmse_loss:.6f}")
         print(f"Test SMAPE Loss: {smape_loss:.6f}%")
-        print(f"Total Inference Time: {total_test_time:.2f} seconds")
+        print(f"Mean Inference Time per Forward Pass: {mean_inference_time:.6f} s ± {std_inference_time:.6f} s")
 
-        return mean_mse, rmse_loss, smape_loss, total_test_time
+        return mean_mse, rmse_loss, smape_loss, mean_inference_time, std_inference_time
