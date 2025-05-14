@@ -1,1 +1,256 @@
-{}
+{
+  "2017": {
+    "pollution": {
+      "OUDEMEER": {
+        "present": true,
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "zero_count": 0,
+        "zero_percent": 0.0,
+        "suspicious_patterns": []
+      },
+      "HAARLEM": {
+        "present": true,
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "zero_count": 0,
+        "zero_percent": 0.0,
+        "suspicious_patterns": []
+      }
+    },
+    "meteo": {
+      "SCHIPOL": {
+        "present": true,
+        "total_records": 4416,
+        "total_missing": 5939,
+        "missing_percent": 5.379528985507246,
+        "missing_by_column": {
+          "T10N": {
+            "count": 3680,
+            "percent": 83.33333333333334
+          },
+          "WW": {
+            "count": 2259,
+            "percent": 51.15489130434783
+          }
+        },
+        "suspicious_patterns": [
+          "1 runs of constant values in FF",
+          "1 runs of constant values in FX"
+        ]
+      }
+    }
+  },
+  "2018": {
+    "pollution": {
+      "OUDEMEER": {
+        "present": true,
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "zero_count": 0,
+        "zero_percent": 0.0,
+        "suspicious_patterns": []
+      },
+      "HAARLEM": {
+        "present": true,
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "zero_count": 0,
+        "zero_percent": 0.0,
+        "suspicious_patterns": []
+      }
+    },
+    "meteo": {
+      "SCHIPOL": {
+        "present": true,
+        "total_records": 4416,
+        "total_missing": 6684,
+        "missing_percent": 6.054347826086957,
+        "missing_by_column": {
+          "T10N": {
+            "count": 3680,
+            "percent": 83.33333333333334
+          },
+          "WW": {
+            "count": 3004,
+            "percent": 68.02536231884058
+          }
+        },
+        "suspicious_patterns": [
+          "1 runs of constant values in DD",
+          "1 runs of constant values in FH"
+        ]
+      }
+    }
+  },
+  "2020": {
+    "pollution": {
+      "OUDEMEER": {
+        "present": true,
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "zero_count": 0,
+        "zero_percent": 0.0,
+        "suspicious_patterns": []
+      },
+      "HAARLEM": {
+        "present": true,
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "zero_count": 0,
+        "zero_percent": 0.0,
+        "suspicious_patterns": []
+      }
+    },
+    "meteo": {
+      "SCHIPOL": {
+        "present": true,
+        "total_records": 4416,
+        "total_missing": 6379,
+        "missing_percent": 5.778079710144928,
+        "missing_by_column": {
+          "T10N": {
+            "count": 3680,
+            "percent": 83.33333333333334
+          },
+          "WW": {
+            "count": 2699,
+            "percent": 61.11865942028986
+          }
+        },
+        "suspicious_patterns": [
+          "1 runs of constant values in DD",
+          "5 runs of constant values in FH"
+        ]
+      }
+    }
+  },
+  "2021": {
+    "pollution": {
+      "OUDEMEER": {
+        "present": true,
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "zero_count": 0,
+        "zero_percent": 0.0,
+        "suspicious_patterns": []
+      },
+      "HAARLEM": {
+        "present": true,
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "zero_count": 0,
+        "zero_percent": 0.0,
+        "suspicious_patterns": []
+      }
+    },
+    "meteo": {
+      "SCHIPOL": {
+        "present": true,
+        "total_records": 4416,
+        "total_missing": 6279,
+        "missing_percent": 5.6875,
+        "missing_by_column": {
+          "T10N": {
+            "count": 3680,
+            "percent": 83.33333333333334
+          },
+          "WW": {
+            "count": 2599,
+            "percent": 58.854166666666664
+          }
+        },
+        "suspicious_patterns": [
+          "1 runs of constant values in DD",
+          "1 runs of constant values in FF",
+          "3 runs of constant values in FH"
+        ]
+      }
+    }
+  },
+  "2022": {
+    "pollution": {
+      "OUDEMEER": {
+        "present": true,
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "zero_count": 0,
+        "zero_percent": 0.0,
+        "suspicious_patterns": []
+      },
+      "HAARLEM": {
+        "present": true,
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "zero_count": 0,
+        "zero_percent": 0.0,
+        "suspicious_patterns": []
+      }
+    },
+    "meteo": {
+      "SCHIPOL": {
+        "present": true,
+        "total_records": 4416,
+        "total_missing": 6648,
+        "missing_percent": 6.021739130434782,
+        "missing_by_column": {
+          "T10N": {
+            "count": 3680,
+            "percent": 83.33333333333334
+          },
+          "WW": {
+            "count": 2968,
+            "percent": 67.21014492753623
+          }
+        },
+        "suspicious_patterns": [
+          "1 runs of constant values in DD",
+          "5 runs of constant values in FH"
+        ]
+      }
+    }
+  },
+  "2023": {
+    "pollution": {
+      "OUDEMEER": {
+        "present": true,
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "zero_count": 0,
+        "zero_percent": 0.0,
+        "suspicious_patterns": []
+      },
+      "HAARLEM": {
+        "present": true,
+        "missing_count": 0,
+        "missing_percent": 0.0,
+        "zero_count": 0,
+        "zero_percent": 0.0,
+        "suspicious_patterns": []
+      }
+    },
+    "meteo": {
+      "SCHIPOL": {
+        "present": true,
+        "total_records": 4416,
+        "total_missing": 6299,
+        "missing_percent": 5.705615942028985,
+        "missing_by_column": {
+          "T10N": {
+            "count": 3680,
+            "percent": 83.33333333333334
+          },
+          "WW": {
+            "count": 2619,
+            "percent": 59.30706521739131
+          }
+        },
+        "suspicious_patterns": [
+          "1 runs of constant values in DD",
+          "2 runs of constant values in FF",
+          "2 runs of constant values in FH"
+        ]
+      }
+    }
+  }
+}

@@ -383,6 +383,7 @@ def compute_pinn_phy_loss(
     dcdx = grad_c[:, :, 0]
     dcdy = grad_c[:, :, 1]
 
+
     residual = dcdt + vx_output * dcdx + vy_output * dcdy
     phy_loss = torch.mean(residual**2)
     return phy_loss

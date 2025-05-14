@@ -146,6 +146,9 @@ def init_transferability_paths(model_city, transfer_city, years, loss_func, nn_t
     if transfer_city == 'Amsterdam':
         data_path = DATA_AMSTERDAM_PATH
         results_path = os.path.join(RESULTS_PATH, 'Amsterdam')
+    elif transfer_city == 'AmsMulti':
+        data_path = DATA_AMSMULTI_PATH
+        results_path = os.path.join(RESULTS_PATH, 'AmsMulti')
     else:
         raise ValueError("Transfer city must be 'Amsterdam'.")
     

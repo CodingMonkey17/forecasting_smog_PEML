@@ -96,8 +96,9 @@ TEST_YEARS = [2021, 2022, 2023]
 
 
 NN_TYPE = "MLP" 
-MODEL_CITY = 'Utrecht'
+MODEL_CITY = 'Multi'
 TRANSFER = True # set to True if you want to use transferability
+TRANSFER_CITY = 'AmsMulti' # Amsterdam for transfer learning using Utrecht model, or AmsMulti for using Multi model
 
 
 # ## Automated Generation of paths and filenames according to data years, loss func, NN type
@@ -106,11 +107,11 @@ TRANSFER = True # set to True if you want to use transferability
 valid_loss_funcs = ["MSE", "LinearShift_MSE", "PDE_nmer_const", "PDE_nmer_piece", "PINN"]
 
 for loss_func in valid_loss_funcs:
-    years, idx_dict, station_names, main_station, original_results_path, results_path, model_path, dataset_path, minmax_path, y_phy_filename, model_filename, results_metrics_filename, bestparams_filename, plot_filename = init_transferability_paths(model_city= MODEL_CITY, transfer_city='Amsterdam', years=YEARS, loss_func=loss_func, nn_type=NN_TYPE)
+    years, idx_dict, station_names, main_station, original_results_path, results_path, model_path, dataset_path, minmax_path, y_phy_filename, model_filename, results_metrics_filename, bestparams_filename, plot_filename = init_transferability_paths(model_city= MODEL_CITY, transfer_city=TRANSFER_CITY, years=YEARS, loss_func=loss_func, nn_type=NN_TYPE)
     print("years: ", years)
     print("idx_dict: ", idx_dict)
     print("station_names: ", station_names)
-    print("main_station: ", main_station)
+    print("original model main_station: ", main_station)
     print("RESULTS_PATH: ", results_path)
     print("original_results_path: ", original_results_path)
     print("MODEL_PATH: ", model_path)
@@ -327,7 +328,7 @@ for loss_func in valid_loss_funcs:
 
     plt.xlabel("Time Step")
     plt.ylabel("NO₂ Level")
-    plt.title(f"Predictions vs. Ground Truth (Denormalized) for Amsterdam with {NN_TYPE} and {loss_func}")
+    plt.title(f"Predictions vs. Ground Truth (Denormalized) for Amsterdam with {NN_TYPE} {MODEL_CITY} model and {loss_func}")
     plt.legend()
     plt.tight_layout()
     # Save the plot

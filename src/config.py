@@ -9,6 +9,7 @@ THESIS_PLOTS_PATH = BASE_DIR / "data" / "thesis_plots"
 DATA_UTRECHT_PATH = BASE_DIR / "data" / "data_combined" / "Utrecht"
 DATA_AMSTERDAM_PATH = BASE_DIR / "data" / "data_combined" / "Amsterdam"
 DATA_MULTI_PATH = BASE_DIR / "data" / "data_combined" / "Multi"
+DATA_AMSMULTI_PATH = BASE_DIR / "data" / "data_combined" / "AmsMulti"
 
 
 
